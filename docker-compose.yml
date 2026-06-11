@@ -1,0 +1,25 @@
+services:
+  api:
+    build: .
+    container_name: movidesk-clickup-api
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    depends_on:
+      - db
+
+  db:
+    image: postgres:16-alpine
+    container_name: movidesk-clickup-db
+    environment:
+      POSTGRES_DB: movidesk_clickup
+      POSTGRES_USER: movidesk
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - movidesk_clickup_data:/var/lib/postgresql/data
+
+volumes:
+  movidesk_clickup_data:
