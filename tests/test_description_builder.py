@@ -3,44 +3,44 @@ from app.services.description_builder import build_clickup_description, build_cl
 
 
 def test_task_name_contains_ticket_id_and_subject():
-    ticket = MovideskTicket(raw={}, id=717525, subject="Teste BI")
-    assert build_clickup_task_name(ticket) == "[MOVI-717525] Teste BI"
+    ticket = MovideskTicket(raw={}, id=123456, subject="Analytics request")
+    assert build_clickup_task_name(ticket) == "[MOVI-123456] Analytics request"
 
 
 def test_description_is_plain_text_without_markdown_headers():
     ticket = MovideskTicket(
         raw={},
-        id=717525,
-        subject="Teste BI",
-        requester_name="Solicitante Teste",
-        service_first_level="GSI",
-        service_second_level="BI",
-        service_third_level="Melhoria/Projeto",
+        id=123456,
+        subject="Analytics request",
+        requester_name="Sample requester",
+        service_first_level="Data",
+        service_second_level="Analytics",
+        service_third_level="Improvement",
         custom_fields={
-            "[BI] Área solicitante": "Dados",
-            "[BI] Tipo de demanda": "Melhoria",
-            "[BI] Nome do dashboard/projeto": "Satisfação Salesforce V2",
-            "[BI] Problema atual": "Relacionamentos não aparecem por dia.",
-            "[BI] Resultado esperado": "Visualizar relacionamentos concluídos por dia.",
-            "Campo adicional livre": "Valor adicional importante",
+            "[BI] Área solicitante": "Operations",
+            "[BI] Tipo de demanda": "Improvement",
+            "[BI] Nome do dashboard/projeto": "Executive dashboard",
+            "[BI] Problema atual": "Daily totals are not matching the source system.",
+            "[BI] Resultado esperado": "Show validated daily totals by business unit.",
+            "Additional field": "Relevant extra value",
         },
         actions=[
             MovideskAction(
                 raw={},
                 created_date="2026-06-11T10:00:00",
-                created_by_name="Vinicius Santos",
-                type="Comentário",
-                description="Ação registrada no Movidesk para BI.",
+                created_by_name="Sample Agent",
+                type="Comment",
+                description="Ticket action registered for the analytics team.",
             )
         ],
     )
     description = build_clickup_description(ticket)
     assert "RESUMO DA DEMANDA" in description
     assert "##" not in description
-    assert "Ticket Movidesk: 717525" in description
-    assert "Área solicitante: Dados." in description
+    assert "Ticket Movidesk: 123456" in description
+    assert "Área solicitante: Operations." in description
     assert "DADOS DE BI PREENCHIDOS NO MOVIDESK" in description
-    assert "Campo adicional livre: Valor adicional importante" in description
+    assert "Additional field: Relevant extra value" in description
     assert "ULTIMAS ACOES DO TICKET" in description
-    assert "Ação registrada no Movidesk para BI." in description
+    assert "Ticket action registered for the analytics team." in description
     assert "[Não informado]" not in description

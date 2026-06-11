@@ -3,12 +3,12 @@ from app.services.movidesk_service import MovideskService
 
 def test_parse_ticket_accepts_numeric_person_ids_and_action_author():
     payload = {
-        "id": 717525,
-        "subject": "Teste BI",
+        "id": 123456,
+        "subject": "Analytics request",
         "status": "Novo",
-        "serviceFirstLevel": "GSI",
-        "serviceSecondLevel": "BI",
-        "serviceThirdLevel": "Melhoria/Projeto",
+        "serviceFirstLevel": "Data",
+        "serviceSecondLevel": "Analytics",
+        "serviceThirdLevel": "Improvement",
         "clients": [{"id": 123}],
         "owner": {"id": 456},
         "customFieldValues": [],

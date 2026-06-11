@@ -199,7 +199,7 @@ def build_clickup_description(ticket: MovideskTicket) -> str:
             ("Status Movidesk", ticket.status),
             ("Solicitante", ticket.requester_name),
             ("Responsável Movidesk", ticket.owner_name),
-            ("Serviço", "GSI > BI > Melhoria/Projeto"),
+            ("Serviço", _service_display_name(ticket)),
         )
     )
 
@@ -242,3 +242,17 @@ def build_clickup_description(ticket: MovideskTicket) -> str:
     ]
 
     return "\n\n".join(section for section in sections if section.strip()) + "\n"
+
+
+def _service_display_name(ticket: MovideskTicket) -> str:
+    settings = get_settings()
+    if settings.required_service_display_name:
+        return settings.required_service_display_name
+
+    parts = [
+        ticket.service_first_level,
+        ticket.service_second_level,
+        ticket.service_third_level,
+    ]
+    filled = [_stringify(part) for part in parts if _is_present(part)]
+    return " > ".join(filled)

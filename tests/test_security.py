@@ -10,7 +10,7 @@ def test_invalid_webhook_secret_returns_401(monkeypatch):
 
     response = TestClient(app).post(
         "/webhooks/movidesk/clickup",
-        json={"Id": 717525},
+        json={"Id": 123456},
         headers={"X-Webhook-Secret": "wrong-secret"},
     )
 

@@ -48,11 +48,11 @@ def test_build_custom_field_values_updates_clickup_fields_and_preserves_existing
                 },
             ]
         },
-        id=717525,
-        subject="Teste BI",
+        id=123456,
+        subject="Analytics request",
     )
     payload = MovideskClickUpUpdatePayload(
-        ticket_id=717525,
+        ticket_id=123456,
         clickup_task_id="86aj09w3f",
         clickup_task_url="https://app.clickup.com/t/86aj09w3f",
         status_integracao="OK",

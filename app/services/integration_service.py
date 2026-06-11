@@ -230,7 +230,7 @@ class IntegrationService:
         if self.settings.clickup_default_list_id:
             return ClickUpDestination(
                 clickup_list_id=self.settings.clickup_default_list_id,
-                clickup_list_name=self.settings.clickup_default_list_name or "Power BI",
+                clickup_list_name=self.settings.clickup_default_list_name or "Default ClickUp list",
             )
 
         return None
@@ -243,7 +243,7 @@ class IntegrationService:
             return "Ticket sem assunto."
 
         if not self._service_matches(ticket):
-            return "Ticket nao pertence ao servico GSI > BI > Melhoria/Projeto."
+            return f"Ticket nao pertence ao servico esperado: {self._required_service_display_name()}."
 
         normalized_status = normalize_label(ticket.status)
         if normalized_status in CLOSED_STATUSES:
@@ -366,6 +366,16 @@ class IntegrationService:
 
     @staticmethod
     def _service_matches(ticket: MovideskTicket) -> bool:
+        settings = get_settings()
+        required_values = [
+            settings.required_service_first_level,
+            settings.required_service_second_level,
+            settings.required_service_third_level,
+        ]
+        required_parts = [normalize_label(value) for value in required_values if value]
+        if not required_parts:
+            return True
+
         service_values = [
             ticket.service_first_level,
             ticket.service_second_level,
@@ -374,11 +384,19 @@ class IntegrationService:
         normalized_parts = [normalize_label(value) for value in service_values if value]
         joined = " > ".join(normalized_parts)
 
-        has_gsi = any(part == "gsi" for part in normalized_parts) or joined.startswith("gsi")
-        has_bi = any(part == "bi" for part in normalized_parts) or " bi " in f" {joined} "
-        has_improvement = "melhoria/projeto" in joined or "melhoria projeto" in joined
+        return all(required in normalized_parts or required in joined for required in required_parts)
 
-        return has_gsi and has_bi and has_improvement
+    def _required_service_display_name(self) -> str:
+        if self.settings.required_service_display_name:
+            return self.settings.required_service_display_name
+
+        parts = [
+            self.settings.required_service_first_level,
+            self.settings.required_service_second_level,
+            self.settings.required_service_third_level,
+        ]
+        configured = [part for part in parts if part]
+        return " > ".join(configured) if configured else "qualquer servico"
 
     def _log(
         self,

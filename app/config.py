@@ -18,11 +18,16 @@ class Settings(BaseSettings):
     clickup_token: str = ""
     clickup_base_url: str = "https://api.clickup.com/api/v2"
     clickup_default_list_id: str = ""
-    clickup_default_list_name: str = "Power BI"
+    clickup_default_list_name: str = ""
     clickup_task_status: str = "Open"
     clickup_assignee_ids: str = ""
-    clickup_assignee_email: str = "vinicius.souza@penso.com.br"
+    clickup_assignee_email: str = ""
     clickup_assign_authorized_user: bool = True
+
+    required_service_first_level: str = ""
+    required_service_second_level: str = ""
+    required_service_third_level: str = ""
+    required_service_display_name: str = ""
 
     webhook_secret: str = ""
     database_url: str = "sqlite:///./movidesk_clickup.db"

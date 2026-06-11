@@ -1,31 +1,105 @@
-# Movidesk ClickUp API
+<p align="center">
+  <strong>Movidesk ClickUp API</strong>
+</p>
 
-API em Python/FastAPI para criar tarefas no ClickUp automaticamente a partir de tickets elegíveis do Movidesk para demandas de BI.
+<p align="center">
+  <a href="https://www.python.org/"><img alt="Python" src="https://img.shields.io/badge/python-3.11%2B-blue"></a>
+  <a href="https://fastapi.tiangolo.com/"><img alt="FastAPI" src="https://img.shields.io/badge/FastAPI-ready-009688"></a>
+  <a href="https://www.docker.com/"><img alt="Docker" src="https://img.shields.io/badge/Docker-ready-2496ED"></a>
+  <a href="./LICENSE"><img alt="License" src="https://img.shields.io/badge/license-Apache%202.0-green"></a>
+</p>
 
-## Objetivo da integração
+API FastAPI para receber webhooks do Movidesk, consultar o ticket completo, validar regras de elegibilidade e criar tarefas no ClickUp com descrição operacional rica.
 
-Na Fase 1, quando um ticket do Movidesk for criado ou alterado, um webhook chama esta API. A API extrai o ID do ticket, consulta o ticket completo no Movidesk, valida se ele pertence ao fluxo `GSI > BI > Melhoria/Projeto`, verifica duplicidade, busca a lista mensal ativa do ClickUp no banco e cria uma tarefa no ClickUp.
+O projeto foi desenhado para ser configurável por ambiente. Nenhum token, e-mail, lista, URL privada ou regra de negócio específica precisa ficar no código.
 
-A Fase 1 não atualiza automaticamente o ticket no Movidesk. A atualização de volta fica preparada para a Fase 2 e permanece desligada por `ENABLE_MOVIDESK_UPDATE=false`.
+## Sumário
+
+- [Visão Geral](#visão-geral)
+- [Fluxo](#fluxo)
+- [Funcionalidades](#funcionalidades)
+- [Arquitetura](#arquitetura)
+- [Estrutura](#estrutura)
+- [Variáveis de Ambiente](#variáveis-de-ambiente)
+- [Rodando Localmente](#rodando-localmente)
+- [Docker](#docker)
+- [Hugging Face Spaces](#hugging-face-spaces)
+- [Banco de Dados](#banco-de-dados)
+- [ClickUp](#clickup)
+- [Movidesk](#movidesk)
+- [Endpoints](#endpoints)
+- [Testes](#testes)
+- [Segurança](#segurança)
+- [Publicação no GitHub](#publicação-no-github)
+
+## Visão Geral
+
+Esta API automatiza um fluxo comum de operação:
+
+1. Um ticket é criado ou atualizado no Movidesk.
+2. Um gatilho do Movidesk chama o endpoint de webhook da API.
+3. A API extrai o ID do ticket do payload.
+4. A API consulta o ticket completo no Movidesk.
+5. A API valida se o ticket pode virar tarefa.
+6. A API consulta a lista de destino do ClickUp.
+7. A API cria a tarefa no ClickUp.
+8. A API registra logs da integração no banco.
+9. Opcionalmente, a API atualiza campos adicionais do ticket no Movidesk.
+
+## Fluxo
+
+```mermaid
+sequenceDiagram
+    participant M as Movidesk
+    participant A as FastAPI
+    participant DB as Database
+    participant C as ClickUp
+
+    M->>A: POST /webhooks/movidesk/clickup
+    A->>A: Extract ticket ID
+    A->>DB: Check duplicate integration
+    A->>M: GET full ticket
+    A->>A: Validate rules
+    A->>DB: Resolve active/default ClickUp list
+    A->>C: Create task
+    A->>DB: Save integration log
+    opt ENABLE_MOVIDESK_UPDATE=true
+        A->>M: PATCH ticket custom fields
+    end
+    A-->>M: JSON response
+```
+
+## Funcionalidades
+
+| Área | Recurso |
+| --- | --- |
+| Webhook | Recebe payloads variados do Movidesk e extrai o ID de múltiplos formatos |
+| Segurança | Suporte opcional a `WEBHOOK_SECRET` |
+| Movidesk | Consulta ticket completo com clientes, responsável, ações e campos adicionais |
+| Validação | Regras configuráveis por serviço, status, campo de criação e link ClickUp |
+| ClickUp | Cria task em lista ativa no banco ou lista padrão por variável |
+| Responsável | Atribui responsável por ID, e-mail ou usuário autenticado do token |
+| Status | Define status inicial da task, por exemplo `Open` |
+| Banco | SQLAlchemy com SQLite local, PostgreSQL ou Turso/libSQL |
+| Auditoria | Registra eventos em `integration_logs` |
+| Deploy | Dockerfile pronto para servidor próprio e Hugging Face Docker Space |
 
 ## Arquitetura
 
 ```text
-Movidesk webhook -> FastAPI -> Movidesk API -> Banco -> ClickUp API
+Movidesk Trigger
+      |
+      v
+FastAPI webhook
+      |
+      +--> Movidesk API: ticket completo
+      |
+      +--> Database: duplicidade, listas e logs
+      |
+      +--> ClickUp API: criação da task
+      |
+      +--> Movidesk API: atualização opcional dos campos adicionais
 ```
-
-Fluxo resumido:
-
-1. Movidesk dispara webhook.
-2. FastAPI recebe o payload e valida `X-Webhook-Secret`.
-3. API extrai `ticket_id`.
-4. API verifica se já existe log `CREATED_SUCCESSFULLY`.
-5. API consulta o ticket completo no Movidesk.
-6. API valida serviço, status e campos adicionais de BI.
-7. API busca a lista mensal ativa em `clickup_monthly_lists`.
-8. API cria tarefa no ClickUp.
-9. API registra logs em `integration_logs`.
-10. API retorna sucesso ou erro controlado ao Movidesk.
 
 ## Estrutura
 
@@ -41,99 +115,72 @@ app/
     webhooks.py
     admin.py
   services/
-    movidesk_service.py
     clickup_service.py
-    integration_service.py
+    custom_fields.py
     description_builder.py
+    integration_service.py
+    movidesk_service.py
     movidesk_update_service.py
   utils/
     logging.py
     security.py
 tests/
-  test_webhook.py
-  test_description_builder.py
-  test_security.py
-  test_integration_service.py
+Dockerfile
+docker-compose.yml
+requirements.txt
+pytest.ini
 ```
 
 ## Variáveis de Ambiente
 
-Obrigatórias em produção:
+Crie um `.env` local a partir do `.env.example`. Nunca commite `.env`.
 
-```env
-MOVIDESK_TOKEN=[TOKEN_MOVIDESK]
-CLICKUP_TOKEN=[TOKEN_CLICKUP]
-DATABASE_URL=[DATABASE_URL]
-```
+### Movidesk
 
-`WEBHOOK_SECRET` é opcional. Se ficar vazio ou ausente, a rota do webhook aceita chamadas sem o header `X-Webhook-Secret`.
+| Variável | Obrigatória | Descrição |
+| --- | --- | --- |
+| `MOVIDESK_TOKEN` | Sim | Token da API pública do Movidesk |
+| `MOVIDESK_BASE_URL` | Não | Default: `https://api.movidesk.com/public/v1` |
+| `MOVIDESK_TICKET_URL_TEMPLATE` | Não | Template para link do ticket. Ex.: `https://example.movidesk.com/Ticket/Edit/{ticket_id}` |
+| `ENABLE_MOVIDESK_UPDATE` | Não | Se `true`, tenta atualizar campos adicionais do ticket após sucesso |
+| `MOVIDESK_SUCCESS_STATUS_VALUE` | Não | Valor gravado no campo de status da integração. Default: `OK` |
 
-Defaults seguros da aplicação:
+### ClickUp
 
-```env
-MOVIDESK_BASE_URL=https://api.movidesk.com/public/v1
-CLICKUP_BASE_URL=https://api.clickup.com/api/v2
-CLICKUP_DEFAULT_LIST_ID=
-CLICKUP_DEFAULT_LIST_NAME=Power BI
-CLICKUP_TASK_STATUS=Open
-CLICKUP_ASSIGNEE_IDS=
-CLICKUP_ASSIGNEE_EMAIL=vinicius.souza@penso.com.br
-CLICKUP_ASSIGN_AUTHORIZED_USER=true
-APP_ENV=dev
-LOG_LEVEL=INFO
-ENABLE_MOVIDESK_UPDATE=false
-MOVIDESK_SUCCESS_STATUS_VALUE=OK
-REQUEST_TIMEOUT_SECONDS=30
-```
+| Variável | Obrigatória | Descrição |
+| --- | --- | --- |
+| `CLICKUP_TOKEN` | Sim | Token da API do ClickUp |
+| `CLICKUP_BASE_URL` | Não | Default: `https://api.clickup.com/api/v2` |
+| `CLICKUP_DEFAULT_LIST_ID` | Não | Lista destino padrão quando não houver lista ativa no banco |
+| `CLICKUP_DEFAULT_LIST_NAME` | Não | Nome amigável da lista padrão |
+| `CLICKUP_TASK_STATUS` | Não | Status inicial da task. Default: `Open` |
+| `CLICKUP_ASSIGNEE_IDS` | Não | IDs numéricos do ClickUp separados por vírgula |
+| `CLICKUP_ASSIGNEE_EMAIL` | Não | E-mail usado para tentar resolver o responsável na lista |
+| `CLICKUP_ASSIGN_AUTHORIZED_USER` | Não | Se `true`, usa o usuário do token quando aplicável |
 
-Opcional:
+### Banco
 
-```env
-MOVIDESK_TICKET_URL_TEMPLATE=[MOVIDESK_TICKET_URL_TEMPLATE]
-```
+| Variável | Obrigatória | Descrição |
+| --- | --- | --- |
+| `DATABASE_URL` | Não | SQLAlchemy URL. Default local: `sqlite:///./movidesk_clickup.db` |
+| `TURSO_DATABASE_URL` | Não | URL `libsql://...` do Turso. Se definida, tem prioridade sobre `DATABASE_URL` |
+| `TURSO_AUTH_TOKEN` | Se usar Turso | Token do banco Turso |
+| `POSTGRES_PASSWORD` | Se usar compose local | Senha usada pelo PostgreSQL do `docker-compose.yml` |
 
-Use PostgreSQL em produção. SQLite é indicado apenas para desenvolvimento local.
+### Regras
 
-Para `docker compose` local com PostgreSQL, defina também:
+| Variável | Obrigatória | Descrição |
+| --- | --- | --- |
+| `REQUIRED_SERVICE_FIRST_LEVEL` | Não | Primeiro nível de serviço esperado no Movidesk |
+| `REQUIRED_SERVICE_SECOND_LEVEL` | Não | Segundo nível de serviço esperado |
+| `REQUIRED_SERVICE_THIRD_LEVEL` | Não | Terceiro nível de serviço esperado |
+| `REQUIRED_SERVICE_DISPLAY_NAME` | Não | Nome exibido na descrição e mensagens |
+| `WEBHOOK_SECRET` | Não | Se definido, exige header `X-Webhook-Secret` |
+| `APP_ENV` | Não | `dev`, `staging`, `prod` |
+| `LOG_LEVEL` | Não | Default: `INFO` |
+| `REQUEST_TIMEOUT_SECONDS` | Não | Timeout das chamadas HTTP |
 
-```env
-POSTGRES_PASSWORD=[POSTGRES_PASSWORD]
-```
-
-## Usar Turso como Banco
-
-Sim, o banco pode ser Turso. A URL `https://app.turso.tech/viniciuskanh` é o dashboard da sua conta, não a URL de conexão.
-
-Você precisa criar um database no Turso e obter dois valores:
-
-```env
-TURSO_DATABASE_URL=libsql://[NOME_DO_BANCO]-[ORG].turso.io
-TURSO_AUTH_TOKEN=[TOKEN_TURSO]
-```
-
-Quando `TURSO_DATABASE_URL` estiver preenchido, a aplicação ignora `DATABASE_URL` e usa Turso via SQLAlchemy/libSQL.
-
-Observação para Windows local: a dependência `sqlalchemy-libsql` é instalada automaticamente no Docker/Linux. Em Windows nativo, prefira rodar a API via Docker ou WSL se quiser testar Turso localmente.
-
-Pelo dashboard:
-
-1. Acesse `https://app.turso.tech/viniciuskanh`.
-2. Crie um database, por exemplo `movidesk-clickup`.
-3. Copie a URL de conexão do banco, no formato `libsql://...turso.io`.
-4. Gere um token de acesso para esse database.
-5. Configure `TURSO_DATABASE_URL` e `TURSO_AUTH_TOKEN` no `.env` local ou nos Secrets do Hugging Face Space.
-
-Pela CLI do Turso, os comandos equivalentes são:
-
-```bash
-turso db create movidesk-clickup
-turso db show --url movidesk-clickup
-turso db tokens create movidesk-clickup
-```
-
-Não coloque o token do Turso no README, Dockerfile ou código.
-
-## Rodar localmente
+## Rodando Localmente
 
 ```bash
 python -m venv .venv
@@ -143,24 +190,20 @@ Windows PowerShell:
 
 ```powershell
 .\.venv\Scripts\Activate.ps1
-```
-
-Instale as dependências:
-
-```bash
 pip install -r requirements.txt
 ```
 
-Crie o `.env` local a partir do exemplo e preencha com valores reais apenas na sua máquina:
+Linux/macOS:
+
+```bash
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+Crie o `.env`:
 
 ```bash
 cp .env.example .env
-```
-
-Para desenvolvimento local simples, configure:
-
-```env
-DATABASE_URL=sqlite:///./movidesk_clickup.db
 ```
 
 Suba a API:
@@ -169,245 +212,265 @@ Suba a API:
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-Healthcheck:
+Teste:
 
 ```bash
 curl http://localhost:8000/health
 ```
 
-Resposta:
+Resposta esperada:
 
 ```json
 {"status":"ok","service":"movidesk-clickup-api"}
 ```
 
-## Rodar com Docker
+## Docker
+
+Build:
 
 ```bash
 docker build -t movidesk-clickup-api .
+```
+
+Run:
+
+```bash
 docker run --rm -p 8000:8000 --env-file .env movidesk-clickup-api
 ```
 
-Com Docker Compose:
+Docker Compose com PostgreSQL:
 
 ```bash
 docker compose up --build
 ```
 
-O Dockerfile local respeita `PORT` quando a variável existir e usa `8000` como fallback.
+## Hugging Face Spaces
 
-## Cadastrar lista mensal ativa
+Use um Space do tipo **Docker**.
 
-Antes de processar webhooks reais, cadastre a lista mensal ativa do ClickUp. Se `active=true`, todas as demais listas são inativadas.
+O `README.md` do Space deve conter:
 
-Como alternativa mais simples, você pode configurar uma lista padrão por variável de ambiente:
-
-```env
-CLICKUP_DEFAULT_LIST_ID=901327529184
-CLICKUP_DEFAULT_LIST_NAME=Power BI
-CLICKUP_TASK_STATUS=Open
-CLICKUP_ASSIGNEE_EMAIL=vinicius.souza@penso.com.br
+```yaml
+---
+title: Movidesk ClickUp API
+sdk: docker
+app_port: 7860
+---
 ```
 
-Pelo link que você informou, `https://app.clickup.com/37014273/v/b/li/901327529184`, o ID provável da lista é `901327529184`. A API do ClickUp cria tarefas em **Lista**; se `Power BI` for uma pasta, use uma lista dentro dela. Como o link contém `/li/`, ele parece apontar para uma lista.
+O Dockerfile deve subir Uvicorn em `0.0.0.0`:
 
-O ClickUp exige ID numérico para responsável. A aplicação tenta resolver automaticamente pelo e-mail `CLICKUP_ASSIGNEE_EMAIL` na lista e, se o token pertencer ao mesmo e-mail, pelo usuário autenticado. Se quiser evitar qualquer tentativa automática, preencha diretamente:
-
-```env
-CLICKUP_ASSIGNEE_IDS=[ID_NUMERICO_DO_USUARIO]
+```dockerfile
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-7860}"]
 ```
 
-Se quiser manter o controle pelo banco, cadastre essa lista como ativa:
+Configure tokens em **Settings > Variables and secrets**. Não envie `.env` para o Space.
+
+## Banco de Dados
+
+As tabelas são criadas automaticamente na inicialização:
+
+```text
+clickup_monthly_lists
+integration_logs
+```
+
+### SQLite
+
+Indicado para testes locais:
+
+```env
+DATABASE_URL=sqlite:///./movidesk_clickup.db
+```
+
+### PostgreSQL
+
+Indicado para produção tradicional:
+
+```env
+DATABASE_URL=postgresql+psycopg2://user:password@host:5432/database
+```
+
+### Turso
+
+Indicado para deploy simples com libSQL:
+
+```env
+TURSO_DATABASE_URL=libsql://your-database-your-org.turso.io
+TURSO_AUTH_TOKEN=[TURSO_AUTH_TOKEN]
+```
+
+Observação: em Windows nativo, a dependência `sqlalchemy-libsql` pode exigir build tools. Para Turso local, prefira Docker ou WSL.
+
+## ClickUp
+
+A API cria tasks pelo endpoint:
+
+```text
+POST /list/{list_id}/task
+```
+
+Você pode escolher o destino de duas formas.
+
+### Lista padrão por variável
+
+```env
+CLICKUP_DEFAULT_LIST_ID=[CLICKUP_LIST_ID]
+CLICKUP_DEFAULT_LIST_NAME=[CLICKUP_LIST_NAME]
+```
+
+### Lista ativa no banco
 
 ```bash
 curl -X POST http://localhost:8000/admin/clickup-lists \
   -H "Content-Type: application/json" \
-  -d "{\"year\":2026,\"month_number\":6,\"month_name\":\"Junho\",\"clickup_list_name\":\"Power BI\",\"clickup_list_id\":\"901327529184\",\"active\":true}"
+  -d "{\"year\":2026,\"month_number\":6,\"month_name\":\"June\",\"clickup_list_name\":\"June 2026\",\"clickup_list_id\":\"[CLICKUP_LIST_ID]\",\"active\":true}"
 ```
 
-Listar listas:
+Se `active=true`, as demais listas são inativadas.
+
+## Movidesk
+
+Crie um gatilho em:
+
+```text
+Tickets -> Gatilhos -> Novo gatilho
+```
+
+Configuração sugerida:
+
+| Campo | Valor |
+| --- | --- |
+| Nome | `Send eligible tickets to ClickUp` |
+| Gatilho para | `Tickets` |
+| Ação | `Acionar webhook` |
+| URL | `https://your-api-domain.example/webhooks/movidesk/clickup` |
+
+Se usar `WEBHOOK_SECRET`, envie o header:
+
+```text
+X-Webhook-Secret: [WEBHOOK_SECRET]
+```
+
+Se não usar segredo, deixe o header vazio.
+
+## Endpoints
+
+### `GET /health`
 
 ```bash
-curl http://localhost:8000/admin/clickup-lists
+curl http://localhost:8000/health
 ```
 
-Ativar uma lista existente:
+### `POST /webhooks/movidesk/clickup`
 
-```bash
-curl -X PUT http://localhost:8000/admin/clickup-lists/1/activate
-```
-
-## Testar webhook
-
-Teste com o ticket controlado `717525`.
-
-Se `WEBHOOK_SECRET` estiver vazio, use:
+Payload mínimo para teste manual:
 
 ```bash
 curl -X POST http://localhost:8000/webhooks/movidesk/clickup \
   -H "Content-Type: application/json" \
-  -d "{\"Id\":717525}"
-```
-
-Se `WEBHOOK_SECRET` estiver configurado, use:
-
-```bash
-curl -X POST http://localhost:8000/webhooks/movidesk/clickup \
-  -H "Content-Type: application/json" \
-  -H "X-Webhook-Secret: [WEBHOOK_SECRET]" \
-  -d "{\"Id\":717525}"
+  -d "{\"Id\":123456}"
 ```
 
 Campos aceitos para extração do ID:
 
 ```json
-{"Id":717525}
-{"id":717525}
-{"TicketId":717525}
-{"ticketId":717525}
-{"ticket_id":717525}
-{"Ticket":{"Id":717525}}
-{"ticket":{"id":717525}}
+{"Id":123456}
+{"id":123456}
+{"TicketId":123456}
+{"ticketId":123456}
+{"ticket_id":123456}
+{"number":123456}
+{"Ticket":{"Id":123456}}
+{"ticket":{"id":123456}}
 ```
 
-Resposta quando cria tarefa:
+Sucesso:
 
 ```json
 {
   "success": true,
   "message": "Tarefa criada no ClickUp com sucesso.",
-  "ticket_id": 717525,
-  "clickup_task_id": "[ID_TASK]",
-  "clickup_task_url": "[URL_TASK]"
+  "ticket_id": 123456,
+  "clickup_task_id": "[CLICKUP_TASK_ID]",
+  "clickup_task_url": "[CLICKUP_TASK_URL]"
 }
 ```
 
-Resposta quando já foi integrado:
+Duplicado:
 
 ```json
 {
   "success": true,
   "message": "Ticket já integrado anteriormente. Nenhuma nova tarefa foi criada.",
-  "ticket_id": 717525,
-  "clickup_task_id": null,
-  "clickup_task_url": null
+  "ticket_id": 123456
 }
 ```
 
-## Configurar gatilho no Movidesk
+### `GET /admin/clickup-lists`
 
-Configuração sugerida:
+Lista as listas cadastradas.
+
+### `POST /admin/clickup-lists`
+
+Cadastra uma lista do ClickUp.
+
+### `PUT /admin/clickup-lists/{id}/activate`
+
+Ativa uma lista e inativa as demais.
+
+### `GET /admin/integration-logs`
+
+Filtros disponíveis:
 
 ```text
-Nome: BI - Enviar para ClickUp via Webhook
-Tipo: Tickets
-Disparo: ticket criado ou ticket alterado
-URL: https://[URL_DA_API]/webhooks/movidesk/clickup
-Header: X-Webhook-Secret: [WEBHOOK_SECRET]
-Payload: {"Id": "[ID_DO_TICKET]"}
+ticket_id
+status
+start_date
+end_date
+limit
 ```
 
-Se você não usar `WEBHOOK_SECRET`, deixe esse header fora do gatilho.
-
-Condições recomendadas:
-
-```text
-Serviço: GSI > BI > Melhoria/Projeto
-Status diferente de Resolvido
-Status diferente de Fechado
-Status diferente de Cancelado
-Status diferente de Aguardando Informação
-[BI] Criar tarefa no ClickUp? = Sim, se o campo existir
-[BI] Link ClickUp vazio, se o campo existir
-```
-
-## Regras de validação
-
-A API não cria tarefa quando:
-
-- o payload não contém ID de ticket;
-- o ticket não possui assunto;
-- o ticket não pertence a `GSI > BI > Melhoria/Projeto`;
-- o ticket está em `Resolvido`, `Fechado`, `Cancelado` ou `Aguardando Informação`;
-- `[BI] Criar tarefa no ClickUp?` existe e está diferente de `Sim`;
-- `[BI] Link ClickUp` já está preenchido;
-- já existe log `CREATED_SUCCESSFULLY` para o mesmo ticket;
-- não existe lista mensal ativa do ClickUp.
-
-## Logs
-
-Logs operacionais são emitidos em JSON no stdout. A tabela `integration_logs` registra eventos com payload sanitizado. Chaves como token, senha, secret e authorization são mascaradas.
-
-Consultar logs:
+Exemplo:
 
 ```bash
-curl http://localhost:8000/admin/integration-logs
-curl "http://localhost:8000/admin/integration-logs?ticket_id=717525"
-curl "http://localhost:8000/admin/integration-logs?status=CREATED_SUCCESSFULLY"
+curl "http://localhost:8000/admin/integration-logs?ticket_id=123456"
 ```
 
-## Hugging Face Docker Space
+## Regras de Validação
 
-A subpasta `movidesk-clickup-api/` está preparada como Hugging Face Space Docker.
+A API não cria task quando:
 
-No painel do Space, configure os valores reais em **Settings > Variables and secrets**. Não envie `.env` para o Space.
+- o payload não contém ID do ticket;
+- o ticket não possui assunto;
+- o ticket está em status bloqueado;
+- o serviço do ticket não bate com `REQUIRED_SERVICE_*`, quando configurado;
+- o campo `[BI] Criar tarefa no ClickUp?` existe e não está como `Sim`;
+- o campo `[BI] Link ClickUp` já está preenchido;
+- já existe log `CREATED_SUCCESSFULLY` para o ticket;
+- não existe lista ativa nem `CLICKUP_DEFAULT_LIST_ID`.
 
-Secrets recomendados:
+Status bloqueados:
 
 ```text
-MOVIDESK_TOKEN
-CLICKUP_TOKEN
-TURSO_AUTH_TOKEN
+Resolvido
+Fechado
+Cancelado
+Aguardando Informação
 ```
 
-Variables recomendadas:
+## Atualização do Movidesk
+
+Quando `ENABLE_MOVIDESK_UPDATE=true`, a API tenta atualizar:
 
 ```text
-MOVIDESK_BASE_URL=https://api.movidesk.com/public/v1
-CLICKUP_BASE_URL=https://api.clickup.com/api/v2
-TURSO_DATABASE_URL=libsql://[NOME_DO_BANCO]-[ORG].turso.io
-CLICKUP_DEFAULT_LIST_ID=901327529184
-CLICKUP_DEFAULT_LIST_NAME=Power BI
-CLICKUP_TASK_STATUS=Open
-CLICKUP_ASSIGNEE_EMAIL=vinicius.souza@penso.com.br
-CLICKUP_ASSIGN_AUTHORIZED_USER=true
-APP_ENV=prod
-LOG_LEVEL=INFO
-ENABLE_MOVIDESK_UPDATE=false
-REQUEST_TIMEOUT_SECONDS=30
-PORT=7860
+[BI] ID ClickUp
+[BI] Link ClickUp
+[BI] Status integração ClickUp
+[BI] Mensagem erro integração
 ```
 
-`WEBHOOK_SECRET` e `DATABASE_URL` só precisam ser configurados se você quiser usar, respectivamente, proteção por header ou outro banco que não seja Turso.
-
-O Space Docker usa `app_port: 7860` e o comando Uvicorn escuta em `0.0.0.0`.
-
-## Segurança
-
-- Nunca coloque tokens no código, README, Dockerfile ou commits.
-- Nunca versione `.env`.
-- Configure segredos reais no Hugging Face pelo painel do Space.
-- Use `WEBHOOK_SECRET` em produção quando houver como controlar o header no webhook. Se não houver, deixe vazio e compense com URL difícil de adivinhar, HTTPS e monitoramento de logs.
-- Não exponha rotas `/admin` publicamente sem autenticação adicional em produção.
-- Revise os logs antes de habilitar o gatilho para muitos tickets.
-
-## Fase 2
-
-Na Fase 2, a atualização automática do Movidesk poderá preencher:
-
-- `[BI] ID ClickUp`
-- `[BI] Link ClickUp`
-- `[BI] Status integração ClickUp`
-- `[BI] Mensagem erro integração`
-
-Para ativar depois que a criação da task no ClickUp estiver validada:
-
-```env
-ENABLE_MOVIDESK_UPDATE=true
-MOVIDESK_SUCCESS_STATUS_VALUE=OK
-```
-
-Quando ativado, a API atualiza os campos adicionais do ticket após criar a task com sucesso. Se o ticket já tiver log `CREATED_SUCCESSFULLY`, uma nova chamada do webhook tenta atualizar os campos no Movidesk sem criar outra task.
+O Movidesk só retorna e atualiza campos adicionais quando as regras de exibição desses campos estão atingidas no ticket. Se esses campos não aparecem na resposta da API, a criação da task continua funcionando, mas a atualização de volta pode não ocorrer.
 
 ## Testes
 
@@ -415,3 +478,33 @@ Quando ativado, a API atualiza os campos adicionais do ticket após criar a task
 python -m compileall app
 pytest
 ```
+
+## Segurança
+
+- Nunca commite `.env`.
+- Nunca coloque tokens no README, Dockerfile ou código.
+- Use Secrets/Variables no provedor de deploy.
+- Use `WEBHOOK_SECRET` quando o gatilho permitir header customizado.
+- Proteja rotas `/admin` antes de expor em produção pública.
+- Revise logs para evitar registrar dados sensíveis.
+
+## Publicação no GitHub
+
+Verifique se não há segredos:
+
+```bash
+git status --short
+git grep -n "TOKEN\\|SECRET\\|PASSWORD"
+```
+
+Commit:
+
+```bash
+git add .
+git commit -m "Prepare public Movidesk ClickUp API"
+git push origin main
+```
+
+## Licença
+
+Apache License 2.0. Veja [LICENSE](./LICENSE).
