@@ -24,6 +24,8 @@ O projeto foi desenhado para ser configurável por ambiente. Nenhum token, e-mai
 - [Rodando Localmente](#rodando-localmente)
 - [Docker](#docker)
 - [Hugging Face Spaces](#hugging-face-spaces)
+- [Deploy na Vercel](#deploy-na-vercel)
+- [Painel Administrativo](#painel-administrativo)
 - [Banco de Dados](#banco-de-dados)
 - [ClickUp](#clickup)
 - [Movidesk](#movidesk)
@@ -153,7 +155,7 @@ Crie um `.env` local a partir do `.env.example`. Nunca commite `.env`.
 | `CLICKUP_BASE_URL` | Não | Default: `https://api.clickup.com/api/v2` |
 | `CLICKUP_DEFAULT_LIST_ID` | Não | Lista destino padrão quando não houver lista ativa no banco |
 | `CLICKUP_DEFAULT_LIST_NAME` | Não | Nome amigável da lista padrão |
-| `CLICKUP_TASK_STATUS` | Não | Status inicial da task. Default: `Open` |
+| `CLICKUP_TASK_STATUS` | Não | Status inicial da task (precisa existir exatamente com esse nome na lista do ClickUp). Default: `Open`. Ex.: `Pendente` |
 | `CLICKUP_ASSIGNEE_IDS` | Não | IDs numéricos do ClickUp separados por vírgula |
 | `CLICKUP_ASSIGNEE_EMAIL` | Não | E-mail usado para tentar resolver o responsável na lista |
 | `CLICKUP_ASSIGN_AUTHORIZED_USER` | Não | Se `true`, usa o usuário do token quando aplicável |
@@ -175,10 +177,26 @@ Crie um `.env` local a partir do `.env.example`. Nunca commite `.env`.
 | `REQUIRED_SERVICE_SECOND_LEVEL` | Não | Segundo nível de serviço esperado |
 | `REQUIRED_SERVICE_THIRD_LEVEL` | Não | Terceiro nível de serviço esperado |
 | `REQUIRED_SERVICE_DISPLAY_NAME` | Não | Nome exibido na descrição e mensagens |
+| `MOVIDESK_REQUIRED_OWNER_ID` | Não | ID do agente responsável exigido. Maior prioridade |
+| `MOVIDESK_REQUIRED_OWNER_EMAIL` | Não | E-mail do responsável exigido (comparado normalizado: trim + lowercase). Usado se `MOVIDESK_REQUIRED_OWNER_ID` estiver vazio |
+| `MOVIDESK_REQUIRED_OWNER_NAME` | Não | Nome do responsável exigido, fallback de último caso. Usado só se os dois acima estiverem vazios |
 | `WEBHOOK_SECRET` | Não | Se definido, exige header `X-Webhook-Secret` |
 | `APP_ENV` | Não | `dev`, `staging`, `prod` |
 | `LOG_LEVEL` | Não | Default: `INFO` |
 | `REQUEST_TIMEOUT_SECONDS` | Não | Timeout das chamadas HTTP |
+
+> Se as três variáveis de responsável ficarem vazias, a integração **não bloqueia por responsável** (comportamento anterior preservado). Configure apenas uma delas — a de maior prioridade que você preencher é a única usada.
+
+### Painel administrativo (`/admin/ui`)
+
+| Variável | Obrigatória | Descrição |
+| --- | --- | --- |
+| `ADMIN_USERNAME` | Para habilitar o painel | Usuário de login do painel `/admin/ui` |
+| `ADMIN_PASSWORD` | Para habilitar o painel | Senha do painel (comparada em texto puro via `secrets.compare_digest`, nunca logada) |
+| `ADMIN_SESSION_SECRET` | Recomendado | Chave usada para assinar o cookie de sessão. Gere um valor longo e aleatório |
+| `ADMIN_SESSION_TTL_MINUTES` | Não | Duração da sessão em minutos. Default: `480` (8h) |
+
+Se `ADMIN_USERNAME`/`ADMIN_PASSWORD` não estiverem configurados, todas as rotas `/admin/*` (exceto `/admin/ui`, que só mostra a tela de login) retornam `503`, ou seja, o painel fica desabilitado por padrão até você configurá-lo.
 
 ## Rodando Localmente
 
@@ -265,6 +283,32 @@ CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-7860}"]
 ```
 
 Configure tokens em **Settings > Variables and secrets**. Não envie `.env` para o Space.
+
+## Deploy na Vercel
+
+O projeto inclui `api/index.py` (expõe o `app` FastAPI) e `vercel.json` prontos para deploy serverless.
+
+1. Suba o repositório para o GitHub (sem `.env` — confira que o `.gitignore` está correto).
+2. Na Vercel, importe o repositório como novo projeto (framework: **Other**).
+3. Em **Settings > Environment Variables**, cadastre todas as variáveis de `.env.example` com os valores reais, com atenção especial a:
+   - `TURSO_DATABASE_URL` e `TURSO_AUTH_TOKEN` — **obrigatórios em produção**. A Vercel não tem disco persistente, então `DATABASE_URL` (SQLite) não funciona lá; o banco efetivo em produção precisa ser o Turso.
+   - `ADMIN_USERNAME`, `ADMIN_PASSWORD`, `ADMIN_SESSION_SECRET` — habilitam o painel `/admin/ui`.
+   - `WEBHOOK_SECRET` — configure o mesmo valor no gatilho do Movidesk (header `X-Webhook-Secret`).
+4. Deploy. A API fica disponível em `https://SEU-PROJETO.vercel.app`, com o painel em `https://SEU-PROJETO.vercel.app/admin/ui`.
+5. Configure o webhook do Movidesk para chamar `https://SEU-PROJETO.vercel.app/webhooks/movidesk/clickup`.
+
+> Ative também a **Vercel Deployment Protection** (ou ao menos mantenha o painel só acessível por quem tem usuário/senha) já que a URL fica pública por padrão.
+
+## Painel Administrativo
+
+Acesse `/admin/ui` para:
+
+- ver qual lista do ClickUp está ativa no mês atual;
+- colar o **Folder ID** da pasta do mês e escolher, dentre as listas encontradas nela, qual deve receber as tarefas — a API resolve Folder → List automaticamente, sem você precisar descobrir o List ID manualmente;
+- acompanhar o histórico de listas já configuradas por mês;
+- consultar os logs de integração mais recentes (criado, ignorado, erro).
+
+O login exige `ADMIN_USERNAME`/`ADMIN_PASSWORD` (configurados por variável de ambiente) e mantém uma sessão via cookie assinado (`ADMIN_SESSION_SECRET`) por `ADMIN_SESSION_TTL_MINUTES` minutos. Repita o passo de configurar pasta/lista todo início de mês, quando a pasta do ClickUp mudar.
 
 ## Banco de Dados
 
@@ -437,12 +481,29 @@ Exemplo:
 curl "http://localhost:8000/admin/integration-logs?ticket_id=123456"
 ```
 
+### `POST /admin/login` / `POST /admin/logout` / `GET /admin/me`
+
+Autenticação do painel administrativo (ver [Painel Administrativo](#painel-administrativo)). Todas as rotas `/admin/*` abaixo, exceto login, exigem sessão válida (cookie `HttpOnly`).
+
+### `GET /admin/clickup/folders/{folder_id}/lists`
+
+Consulta as listas existentes dentro de uma pasta (Folder) do ClickUp — usado pelo painel para resolver Folder ID → List ID sem que você precise descobrir o List ID manualmente.
+
+### `POST /admin/clickup/folders/setup`
+
+Ativa, para o mês/ano atual, a lista escolhida a partir de uma pasta. Preenche automaticamente ano/mês e desativa as demais listas.
+
+### `GET /admin/ui`
+
+Painel administrativo (HTML) para configurar a pasta/lista do mês e acompanhar os logs de integração.
+
 ## Regras de Validação
 
 A API não cria task quando:
 
 - o payload não contém ID do ticket;
 - o ticket não possui assunto;
+- o responsável atual do ticket não é o usuário configurado em `MOVIDESK_REQUIRED_OWNER_*` (quando alguma dessas variáveis está definida) — log `IGNORED_OWNER`;
 - o ticket está em status bloqueado;
 - o serviço do ticket não bate com `REQUIRED_SERVICE_*`, quando configurado;
 - o campo `[BI] Criar tarefa no ClickUp?` existe e não está como `Sim`;

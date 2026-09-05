@@ -19,6 +19,8 @@ class ClickUpMonthlyList(Base):
     year: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
     month_number: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
     month_name: Mapped[str] = mapped_column(String(30), nullable=False)
+    clickup_folder_id: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    clickup_folder_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
     clickup_list_name: Mapped[str] = mapped_column(String(120), nullable=False)
     clickup_list_id: Mapped[str] = mapped_column(String(80), nullable=False)
     active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, index=True)

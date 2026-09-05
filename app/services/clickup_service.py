@@ -88,6 +88,64 @@ class ClickUpService:
         user = data.get("user")
         return user if isinstance(user, dict) else None
 
+    async def get_folder_lists(self, folder_id: str) -> list[dict[str, Any]]:
+        """Retorna as listas existentes dentro de uma pasta (Folder) do ClickUp.
+
+        Usado para resolver corretamente Folder ID -> List ID, ja que a API de
+        criacao de tarefa exige uma List ID (nunca um Folder ID).
+        """
+        if not self.settings.clickup_token:
+            raise ClickUpServiceError("CLICKUP_TOKEN nao configurado.")
+
+        url = f"{self.settings.clickup_base_url.rstrip('/')}/folder/{folder_id}/list"
+        headers = {"Authorization": self.settings.clickup_token}
+
+        try:
+            async with httpx.AsyncClient(timeout=self.settings.request_timeout_seconds) as client:
+                response = await client.get(url, headers=headers, params={"archived": "false"})
+        except httpx.HTTPError:
+            raise ClickUpServiceError("Erro de comunicacao ao consultar listas da pasta no ClickUp.") from None
+
+        if response.status_code >= 400:
+            raise ClickUpServiceError(f"Erro ao consultar listas da pasta no ClickUp. HTTP {response.status_code}.")
+
+        try:
+            data = response.json()
+        except ValueError:
+            raise ClickUpServiceError("Resposta inesperada da API do ClickUp.") from None
+
+        lists = data.get("lists") if isinstance(data, dict) else None
+        if not isinstance(lists, list):
+            return []
+
+        return [
+            {"id": str(item.get("id")), "name": item.get("name")}
+            for item in lists
+            if isinstance(item, dict) and item.get("id") is not None
+        ]
+
+    async def get_list(self, list_id: str) -> dict[str, Any] | None:
+        """Consulta uma lista pelo ID, util para validar/exibir o nome da lista configurada."""
+        if not self.settings.clickup_token:
+            raise ClickUpServiceError("CLICKUP_TOKEN nao configurado.")
+
+        url = f"{self.settings.clickup_base_url.rstrip('/')}/list/{list_id}"
+        headers = {"Authorization": self.settings.clickup_token}
+
+        try:
+            async with httpx.AsyncClient(timeout=self.settings.request_timeout_seconds) as client:
+                response = await client.get(url, headers=headers)
+        except httpx.HTTPError:
+            raise ClickUpServiceError("Erro de comunicacao ao consultar lista no ClickUp.") from None
+
+        if response.status_code >= 400:
+            return None
+
+        try:
+            return response.json()
+        except ValueError:
+            return None
+
     async def get_list_member_id_by_email(self, list_id: str, email: str) -> int | None:
         if not self.settings.clickup_token:
             raise ClickUpServiceError("CLICKUP_TOKEN nao configurado.")

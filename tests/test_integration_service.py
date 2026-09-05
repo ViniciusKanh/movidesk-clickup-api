@@ -32,10 +32,69 @@ def make_valid_ticket(**overrides):
         "service_first_level": "Data",
         "service_second_level": "Analytics",
         "service_third_level": "Improvement",
+        "owner_id": "agent-1",
+        "owner_email": "vinicius.souza@penso.com.br",
+        "owner_name": "Vinicius de Souza Santos",
         "custom_fields": {"[BI] Criar tarefa no ClickUp?": "Sim", "[BI] Link ClickUp": ""},
     }
     data.update(overrides)
     return MovideskTicket(**data)
+
+
+def _service_for_owner_test() -> IntegrationService:
+    service = IntegrationService.__new__(IntegrationService)
+    service.settings = get_settings()
+    return service
+
+
+def test_owner_matches_by_id(monkeypatch):
+    monkeypatch.setenv("MOVIDESK_REQUIRED_OWNER_ID", "agent-1")
+    monkeypatch.delenv("MOVIDESK_REQUIRED_OWNER_EMAIL", raising=False)
+    monkeypatch.delenv("MOVIDESK_REQUIRED_OWNER_NAME", raising=False)
+    get_settings.cache_clear()
+
+    service = _service_for_owner_test()
+    ticket = make_valid_ticket(owner_id="agent-1", owner_email="outro@empresa.com")
+    assert service._owner_matches(ticket) is True
+
+    get_settings.cache_clear()
+
+
+def test_owner_matches_by_email_when_no_id_configured(monkeypatch):
+    monkeypatch.delenv("MOVIDESK_REQUIRED_OWNER_ID", raising=False)
+    monkeypatch.setenv("MOVIDESK_REQUIRED_OWNER_EMAIL", "Vinicius.Souza@Penso.com.br")
+    monkeypatch.delenv("MOVIDESK_REQUIRED_OWNER_NAME", raising=False)
+    get_settings.cache_clear()
+
+    service = _service_for_owner_test()
+    ticket = make_valid_ticket(owner_id="agent-2", owner_email="vinicius.souza@penso.com.br  ")
+    assert service._owner_matches(ticket) is True
+
+    get_settings.cache_clear()
+
+
+def test_owner_does_not_match():
+    service = _service_for_owner_test()
+    service.settings.movidesk_required_owner_id = "agent-1"
+    service.settings.movidesk_required_owner_email = ""
+    service.settings.movidesk_required_owner_name = ""
+    ticket = make_valid_ticket(owner_id="agent-999")
+    assert service._owner_matches(ticket) is False
+
+
+def test_owner_check_disabled_when_nothing_configured(monkeypatch):
+    # setenv com string vazia (nao delenv) para sobrepor um eventual valor vindo do .env local,
+    # ja que env var tem prioridade sobre dotenv no pydantic-settings.
+    monkeypatch.setenv("MOVIDESK_REQUIRED_OWNER_ID", "")
+    monkeypatch.setenv("MOVIDESK_REQUIRED_OWNER_EMAIL", "")
+    monkeypatch.setenv("MOVIDESK_REQUIRED_OWNER_NAME", "")
+    get_settings.cache_clear()
+
+    service = _service_for_owner_test()
+    ticket = make_valid_ticket(owner_id=None, owner_email=None, owner_name=None)
+    assert service._owner_matches(ticket) is True
+
+    get_settings.cache_clear()
 
 
 def test_extract_ticket_id_variations():
@@ -135,6 +194,30 @@ async def test_missing_active_list_returns_controlled_error(db_session, monkeypa
     assert response.ticket_id == 123456
     assert response.message == "Nenhuma lista mensal ativa do ClickUp cadastrada."
     assert db_session.query(IntegrationLog).filter(IntegrationLog.status == STATUS_ERROR_VALIDATION).count() == 1
+
+
+@pytest.mark.asyncio
+async def test_webhook_ignores_ticket_when_owner_does_not_match(db_session, monkeypatch):
+    monkeypatch.setenv("MOVIDESK_REQUIRED_OWNER_EMAIL", "vinicius.souza@penso.com.br")
+    get_settings.cache_clear()
+
+    async def fake_get_ticket(self, ticket_id):
+        return make_valid_ticket(id=ticket_id, owner_email="outra.pessoa@penso.com.br")
+
+    async def fail_create_task(self, **kwargs):
+        raise AssertionError("ClickUp nao deveria ser chamado quando o responsavel nao bate.")
+
+    monkeypatch.setattr(MovideskService, "get_ticket", fake_get_ticket)
+    monkeypatch.setattr(ClickUpService, "create_task", fail_create_task)
+
+    response = await IntegrationService(db_session).process_movidesk_webhook({"Id": 123456})
+
+    get_settings.cache_clear()
+    assert response.success is False
+    assert "responsavel" in response.message.lower()
+    from app.services.integration_service import STATUS_IGNORED_OWNER
+
+    assert db_session.query(IntegrationLog).filter(IntegrationLog.status == STATUS_IGNORED_OWNER).count() == 1
 
 
 @pytest.mark.asyncio

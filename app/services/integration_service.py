@@ -26,6 +26,7 @@ STATUS_RECEIVED = "RECEIVED"
 STATUS_CREATED = "CREATED_SUCCESSFULLY"
 STATUS_DUPLICATE = "IGNORED_DUPLICATE"
 STATUS_IGNORED_VALIDATION = "IGNORED_VALIDATION"
+STATUS_IGNORED_OWNER = "IGNORED_OWNER"
 STATUS_ERROR_MOVIDESK = "ERROR_MOVIDESK"
 STATUS_ERROR_CLICKUP = "ERROR_CLICKUP"
 STATUS_ERROR_VALIDATION = "ERROR_VALIDATION"
@@ -98,6 +99,11 @@ class IntegrationService:
             logger.exception("Erro inesperado ao consultar ou mapear ticket no Movidesk")
             message = "Erro ao consultar ou interpretar ticket no Movidesk."
             self._log(ticket_id, None, payload, None, None, STATUS_ERROR_MOVIDESK, message)
+            return WebhookResponse(success=False, message=message, ticket_id=ticket_id)
+
+        if not self._owner_matches(ticket):
+            message = "Ticket ignorado: responsavel atual nao e o usuario configurado para a integracao."
+            self._log(ticket_id, ticket.subject, payload, None, None, STATUS_IGNORED_OWNER, message)
             return WebhookResponse(success=False, message=message, ticket_id=ticket_id)
 
         validation_error = self._validate_ticket(ticket)
@@ -363,6 +369,28 @@ class IntegrationService:
             except ValueError:
                 continue
         return ids
+
+    def _owner_matches(self, ticket: MovideskTicket) -> bool:
+        """Valida se o responsavel atual do ticket e o usuario configurado para a integracao.
+
+        Ordem de preferencia: ID do agente > e-mail > nome (fallback).
+        Usa apenas o primeiro criterio configurado, evitando comparacoes ambiguas.
+        Se nenhum criterio estiver configurado, preserva o comportamento anterior (nao bloqueia).
+        """
+        required_id = (self.settings.movidesk_required_owner_id or "").strip()
+        if required_id:
+            return normalize_label(ticket.owner_id) == normalize_label(required_id)
+
+        required_email = (self.settings.movidesk_required_owner_email or "").strip()
+        if required_email:
+            ticket_email = (ticket.owner_email or "").strip().lower()
+            return ticket_email == required_email.strip().lower()
+
+        required_name = (self.settings.movidesk_required_owner_name or "").strip()
+        if required_name:
+            return normalize_label(ticket.owner_name) == normalize_label(required_name)
+
+        return True
 
     @staticmethod
     def _service_matches(ticket: MovideskTicket) -> bool:

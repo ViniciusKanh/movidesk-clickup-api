@@ -20,6 +20,8 @@ class ClickUpMonthlyListBase(BaseModel):
     year: int = Field(..., ge=2000, le=2100)
     month_number: int = Field(..., ge=1, le=12)
     month_name: str = Field(..., min_length=3, max_length=30)
+    clickup_folder_id: str | None = Field(default=None, max_length=80)
+    clickup_folder_name: str | None = Field(default=None, max_length=120)
     clickup_list_name: str = Field(..., min_length=1, max_length=120)
     clickup_list_id: str = Field(..., min_length=1, max_length=80)
     active: bool = False
@@ -35,6 +37,33 @@ class ClickUpMonthlyListResponse(ClickUpMonthlyListBase):
     updated_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class ClickUpFolderListItem(BaseModel):
+    id: str
+    name: str | None = None
+
+
+class ClickUpFolderSetupRequest(BaseModel):
+    """Fluxo simplificado do painel: informar a pasta e a lista escolhida dentro dela.
+
+    O ano/mes/nome do mes sao preenchidos automaticamente com a data atual do servidor,
+    e a lista informada e ativada automaticamente (desativando as demais).
+    """
+
+    clickup_folder_id: str = Field(..., min_length=1, max_length=80)
+    clickup_folder_name: str | None = Field(default=None, max_length=120)
+    clickup_list_id: str = Field(..., min_length=1, max_length=80)
+    clickup_list_name: str = Field(..., min_length=1, max_length=120)
+
+
+class AdminLoginRequest(BaseModel):
+    username: str
+    password: str
+
+
+class AdminLoginResponse(BaseModel):
+    success: bool = True
 
 
 class IntegrationLogResponse(BaseModel):
@@ -70,6 +99,8 @@ class MovideskTicket(BaseModel):
     service_second_level: str | None = None
     service_third_level: str | None = None
     requester_name: str | None = None
+    owner_id: str | None = None
+    owner_email: str | None = None
     owner_name: str | None = None
     custom_fields: dict[str, Any] = Field(default_factory=dict)
     actions: list[MovideskAction] = Field(default_factory=list)

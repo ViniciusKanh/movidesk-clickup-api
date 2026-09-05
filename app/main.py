@@ -5,7 +5,7 @@ import uvicorn
 from fastapi import FastAPI
 
 from app.database import Base, engine
-from app.routers import admin, health, webhooks
+from app.routers import admin, admin_ui, health, webhooks
 from app.utils.logging import configure_logging
 
 
@@ -26,6 +26,7 @@ app = FastAPI(
 app.include_router(health.router)
 app.include_router(webhooks.router)
 app.include_router(admin.router)
+app.include_router(admin_ui.router)
 
 
 if __name__ == "__main__":

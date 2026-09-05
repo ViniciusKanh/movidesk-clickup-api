@@ -56,7 +56,10 @@ class MovideskService:
     def _parse_ticket(self, payload: dict[str, Any]) -> MovideskTicket:
         custom_fields = self._extract_custom_fields(payload.get("customFieldValues") or [])
         requester_name = self._extract_requester_name(payload.get("clients") or [])
-        owner_name = self._extract_owner_name(payload.get("owner"))
+        owner = payload.get("owner")
+        owner_id = self._extract_owner_id(owner)
+        owner_email = self._extract_owner_email(owner)
+        owner_name = self._extract_owner_name(owner)
         actions = self._extract_actions(payload.get("actions") or [])
 
         ticket_id = payload.get("id") or payload.get("Id")
@@ -76,6 +79,8 @@ class MovideskService:
             service_second_level=self._to_optional_str(payload.get("serviceSecondLevel")),
             service_third_level=self._to_optional_str(payload.get("serviceThirdLevel") or service_full),
             requester_name=requester_name,
+            owner_id=owner_id,
+            owner_email=owner_email,
             owner_name=owner_name,
             custom_fields=custom_fields,
             actions=actions,
@@ -94,6 +99,25 @@ class MovideskService:
             or first.get("name")
             or first.get("email")
             or first.get("id")
+        )
+
+    @staticmethod
+    def _extract_owner_id(owner: Any) -> str | None:
+        if not isinstance(owner, dict):
+            return None
+        return MovideskService._to_optional_str(owner.get("id") or owner.get("Id"))
+
+    @staticmethod
+    def _extract_owner_email(owner: Any) -> str | None:
+        if not isinstance(owner, dict):
+            return None
+        emails = owner.get("emails")
+        if isinstance(emails, list):
+            for item in emails:
+                if isinstance(item, dict) and item.get("email"):
+                    return MovideskService._to_optional_str(item.get("email"))
+        return MovideskService._to_optional_str(
+            owner.get("email") or owner.get("Email") or owner.get("userName") or owner.get("accountEmail")
         )
 
     @staticmethod

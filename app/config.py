@@ -29,7 +29,16 @@ class Settings(BaseSettings):
     required_service_third_level: str = ""
     required_service_display_name: str = ""
 
+    movidesk_required_owner_id: str = ""
+    movidesk_required_owner_email: str = ""
+    movidesk_required_owner_name: str = ""
+
     webhook_secret: str = ""
+
+    admin_username: str = ""
+    admin_password: str = ""
+    admin_session_secret: str = ""
+    admin_session_ttl_minutes: int = 480
     database_url: str = "sqlite:///./movidesk_clickup.db"
     turso_database_url: str = ""
     turso_auth_token: str = ""
