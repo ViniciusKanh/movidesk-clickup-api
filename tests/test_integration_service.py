@@ -61,9 +61,9 @@ def test_owner_matches_by_id(monkeypatch):
 
 
 def test_owner_matches_by_email_when_no_id_configured(monkeypatch):
-    monkeypatch.delenv("MOVIDESK_REQUIRED_OWNER_ID", raising=False)
+    monkeypatch.setenv("MOVIDESK_REQUIRED_OWNER_ID", "")
     monkeypatch.setenv("MOVIDESK_REQUIRED_OWNER_EMAIL", "Vinicius.Souza@Penso.com.br")
-    monkeypatch.delenv("MOVIDESK_REQUIRED_OWNER_NAME", raising=False)
+    monkeypatch.setenv("MOVIDESK_REQUIRED_OWNER_NAME", "")
     get_settings.cache_clear()
 
     service = _service_for_owner_test()
@@ -176,7 +176,10 @@ async def test_duplicate_prevents_clickup_creation(db_session, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_missing_active_list_returns_controlled_error(db_session, monkeypatch):
-    monkeypatch.delenv("CLICKUP_DEFAULT_LIST_ID", raising=False)
+    monkeypatch.setenv("CLICKUP_DEFAULT_LIST_ID", "")
+    monkeypatch.setenv("MOVIDESK_REQUIRED_OWNER_ID", "")
+    monkeypatch.setenv("MOVIDESK_REQUIRED_OWNER_EMAIL", "")
+    monkeypatch.setenv("MOVIDESK_REQUIRED_OWNER_NAME", "")
     get_settings.cache_clear()
 
     async def fake_get_ticket(self, ticket_id):
@@ -226,6 +229,9 @@ async def test_default_clickup_list_is_used_when_no_active_db_list(db_session, m
     monkeypatch.setenv("CLICKUP_DEFAULT_LIST_NAME", "Analytics Requests")
     monkeypatch.setenv("CLICKUP_TASK_STATUS", "Open")
     monkeypatch.setenv("CLICKUP_ASSIGNEE_IDS", "123456")
+    monkeypatch.setenv("MOVIDESK_REQUIRED_OWNER_ID", "")
+    monkeypatch.setenv("MOVIDESK_REQUIRED_OWNER_EMAIL", "")
+    monkeypatch.setenv("MOVIDESK_REQUIRED_OWNER_NAME", "")
     get_settings.cache_clear()
     created_payload = {}
 

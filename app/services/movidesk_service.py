@@ -13,7 +13,13 @@ class MovideskServiceError(Exception):
 
 
 class MovideskService:
-    """Cliente HTTP para consulta de tickets no Movidesk."""
+    """Cliente HTTP para consulta de tickets no Movidesk.
+
+    SOMENTE LEITURA: esta classe expoe apenas GET /tickets (consulta). Ela nunca
+    cria, altera ou exclui nada no Movidesk. A unica escrita no Movidesk do
+    projeto inteiro fica isolada em MovideskUpdateService, e so roda se
+    ENABLE_MOVIDESK_UPDATE=true (default: false).
+    """
 
     def __init__(self) -> None:
         self.settings = get_settings()

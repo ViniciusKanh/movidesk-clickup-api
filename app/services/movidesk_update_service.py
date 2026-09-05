@@ -27,7 +27,9 @@ class MovideskClickUpUpdatePayload:
 
 
 class MovideskUpdateService:
-    """Atualiza campos adicionais do Movidesk na Fase 2, quando habilitado por ambiente."""
+    """Atualiza (PATCH) apenas os campos [BI] do ticket no Movidesk - nunca exclui,
+    fecha ou altera outros campos do ticket. Roda apenas se ENABLE_MOVIDESK_UPDATE=true
+    (default: false). Com a flag desligada, o Movidesk e usado 100% em modo leitura."""
 
     TEXT_FIELDS = {
         "[BI] ID ClickUp": "clickup_task_id",

@@ -5,14 +5,18 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import ClickUpMonthlyList, IntegrationLog
+from app.config import get_settings
 from app.schemas import (
     AdminLoginRequest,
     AdminLoginResponse,
     ClickUpFolderListItem,
     ClickUpFolderSetupRequest,
+    ClickUpIntegrationStatus,
     ClickUpMonthlyListCreate,
     ClickUpMonthlyListResponse,
     IntegrationLogResponse,
+    IntegrationsStatusResponse,
+    MovideskIntegrationStatus,
 )
 from app.services.clickup_service import ClickUpService, ClickUpServiceError
 from app.utils.admin_auth import (
@@ -63,6 +67,64 @@ def logout(response: Response) -> AdminLoginResponse:
 @router.get("/me")
 def me(username: str = Depends(require_admin_session)) -> dict[str, str]:
     return {"username": username}
+
+
+# ---------------------------------------------------------------------------
+# Status das integracoes (para a tela "Integracoes" do ViniciusFlow)
+# ---------------------------------------------------------------------------
+
+
+@router.get("/integrations/status", response_model=IntegrationsStatusResponse)
+def integrations_status(
+    db: Session = Depends(get_db),
+    _: str = Depends(require_admin_session),
+) -> IntegrationsStatusResponse:
+    """Resumo NAO sensivel das duas integracoes (nunca retorna tokens)."""
+    settings = get_settings()
+
+    if settings.movidesk_required_owner_id:
+        owner_rule = "id"
+        owner_value = settings.movidesk_required_owner_id
+    elif settings.movidesk_required_owner_email:
+        owner_rule = "email"
+        owner_value = settings.movidesk_required_owner_email
+    elif settings.movidesk_required_owner_name:
+        owner_rule = "nome"
+        owner_value = settings.movidesk_required_owner_name
+    else:
+        owner_rule = "nenhuma (nao bloqueia por responsavel)"
+        owner_value = None
+
+    movidesk = MovideskIntegrationStatus(
+        configured=bool(settings.movidesk_token),
+        base_url=settings.movidesk_base_url,
+        owner_rule=owner_rule,
+        owner_value=owner_value,
+        read_only=True,
+    )
+
+    active_list = db.query(ClickUpMonthlyList).filter(ClickUpMonthlyList.active.is_(True)).first()
+
+    if settings.clickup_assignee_ids:
+        assignee_mode = "IDs fixos"
+    elif settings.clickup_assignee_email:
+        assignee_mode = "por e-mail"
+    elif settings.clickup_assign_authorized_user:
+        assignee_mode = "usuario do token"
+    else:
+        assignee_mode = "nenhum"
+
+    clickup = ClickUpIntegrationStatus(
+        configured=bool(settings.clickup_token),
+        base_url=settings.clickup_base_url,
+        default_list_id=settings.clickup_default_list_id or None,
+        default_list_name=settings.clickup_default_list_name or None,
+        active_list_name=(f"{active_list.clickup_list_name} ({active_list.month_name}/{active_list.year})" if active_list else None),
+        assignee_mode=assignee_mode,
+        task_status=settings.clickup_task_status or None,
+    )
+
+    return IntegrationsStatusResponse(movidesk=movidesk, clickup=clickup)
 
 
 # ---------------------------------------------------------------------------

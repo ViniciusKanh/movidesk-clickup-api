@@ -10,7 +10,16 @@ class ClickUpServiceError(Exception):
 
 
 class ClickUpService:
-    """Cliente HTTP para criacao de tarefas no ClickUp."""
+    """Cliente HTTP para o ClickUp.
+
+    SEGURANCA: esta classe so tem uma operacao de escrita - create_task (cria
+    uma tarefa NOVA). Nao existe (e nao deve ser adicionado sem pedido
+    explicito) nenhum metodo de update/delete de tarefas existentes, o que
+    evita qualquer risco de alterar ou apagar tarefas de outras pessoas na
+    mesma pasta/lista. As demais chamadas (get_authorized_user,
+    get_folder_lists, get_list, get_list_member_id_by_email) sao apenas
+    leitura, usadas para resolver a lista/assignee corretos antes de criar.
+    """
 
     def __init__(self) -> None:
         self.settings = get_settings()

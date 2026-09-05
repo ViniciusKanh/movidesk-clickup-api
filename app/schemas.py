@@ -66,6 +66,29 @@ class AdminLoginResponse(BaseModel):
     success: bool = True
 
 
+class MovideskIntegrationStatus(BaseModel):
+    configured: bool
+    base_url: str
+    owner_rule: str
+    owner_value: str | None = None
+    read_only: bool = True
+
+
+class ClickUpIntegrationStatus(BaseModel):
+    configured: bool
+    base_url: str
+    default_list_id: str | None = None
+    default_list_name: str | None = None
+    active_list_name: str | None = None
+    assignee_mode: str
+    task_status: str | None = None
+
+
+class IntegrationsStatusResponse(BaseModel):
+    movidesk: MovideskIntegrationStatus
+    clickup: ClickUpIntegrationStatus
+
+
 class IntegrationLogResponse(BaseModel):
     id: int
     ticket_id: int | None
