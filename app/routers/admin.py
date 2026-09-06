@@ -9,6 +9,7 @@ from app.config import get_settings
 from app.schemas import (
     AdminLoginRequest,
     AdminLoginResponse,
+    ClickUpBrowseItem,
     ClickUpFolderListItem,
     ClickUpFolderSetupRequest,
     ClickUpIntegrationStatus,
@@ -158,6 +159,50 @@ async def test_clickup_connection(_: str = Depends(require_admin_session)) -> Co
         return ConnectionTestResult(ok=False, message="Token rejeitado ou sem permissao (GET /user falhou).")
     label = user.get("username") or user.get("email") or "usuario autenticado"
     return ConnectionTestResult(ok=True, message=f"Conexao OK - token valido, autenticado como {label}.")
+
+
+# ---------------------------------------------------------------------------
+# ClickUp: navegacao Workspace -> Space -> Folder (GET apenas)
+#
+# Evita o erro mais comum do painel: o usuario nao consegue distinguir um
+# Folder ID de um List ID copiando links do ClickUp, e cola o ID errado no
+# campo "Folder ID" (sempre resulta em 404 ao buscar listas). Com estes
+# endpoints o proprio painel lista os workspaces/spaces/pastas disponiveis
+# para o token configurado, sem precisar colar nenhum ID a mao.
+# ---------------------------------------------------------------------------
+
+
+@router.get("/clickup/teams", response_model=list[ClickUpBrowseItem])
+async def get_clickup_teams(_: str = Depends(require_admin_session)) -> list[ClickUpBrowseItem]:
+    try:
+        teams = await ClickUpService().get_teams()
+    except ClickUpServiceError as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+    return [ClickUpBrowseItem(**item) for item in teams]
+
+
+@router.get("/clickup/teams/{team_id}/spaces", response_model=list[ClickUpBrowseItem])
+async def get_clickup_spaces(
+    team_id: str,
+    _: str = Depends(require_admin_session),
+) -> list[ClickUpBrowseItem]:
+    try:
+        spaces = await ClickUpService().get_spaces(team_id)
+    except ClickUpServiceError as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+    return [ClickUpBrowseItem(**item) for item in spaces]
+
+
+@router.get("/clickup/spaces/{space_id}/folders", response_model=list[ClickUpBrowseItem])
+async def get_clickup_folders(
+    space_id: str,
+    _: str = Depends(require_admin_session),
+) -> list[ClickUpBrowseItem]:
+    try:
+        folders = await ClickUpService().get_folders(space_id)
+    except ClickUpServiceError as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+    return [ClickUpBrowseItem(**item) for item in folders]
 
 
 # ---------------------------------------------------------------------------

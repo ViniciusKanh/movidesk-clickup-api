@@ -48,6 +48,13 @@ _PAGE = """<!doctype html>
   }
   input::placeholder { color: var(--text-faint); }
   input[type=text]:focus, input[type=password]:focus { border-color: var(--violet); }
+  select {
+    width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:8px;
+    font-size:13.5px; background: var(--bg); color: var(--text); font-family: var(--sans);
+  }
+  select:disabled { opacity:.5; cursor:not-allowed; }
+  select:focus { border-color: var(--violet); }
+  a { color: var(--teal); }
 
   button { font-family: var(--sans); border:none; border-radius:8px; font-size:14px; cursor:pointer; font-weight:600; }
   button.primary { background: var(--violet); color:#100e1c; padding:11px 18px; }
@@ -332,14 +339,30 @@ _PAGE = """<!doctype html>
         </div>
         <div class="card">
           <h3>No: ClickUp &mdash; pasta/lista do mes</h3>
-          <p class="hint">Cole o Folder ID da pasta atual (nao o ID da lista) e escolha a lista certa.</p>
-          <label>Folder ID do ClickUp</label>
-          <input id="folderIdInput" type="text" placeholder="Ex: 90123456789" />
+          <p class="hint">Navegue Workspace &rarr; Space &rarr; Pasta (sem precisar copiar nenhum ID a mao).</p>
+
+          <label>Workspace</label>
+          <select id="teamSelect"><option value="">Carregando...</option></select>
+          <label>Space</label>
+          <select id="spaceSelect" disabled><option value="">Escolha o workspace primeiro</option></select>
+          <label>Pasta (Folder)</label>
+          <select id="folderSelect" disabled><option value="">Escolha o space primeiro</option></select>
+          <div id="browseMsg" class="msg"></div>
+
           <div class="hint-block">
-            No ClickUp: abra a PASTA (nao a lista) &rarr; "..." &rarr; Copiar link. O numero no
-            final do link e o Folder ID. Colar aqui o ID de uma lista (o mesmo numero que aparece
-            em "lista padrao" abaixo) sempre resulta em erro 404.
+            Prefere colar o ID manualmente? <a href="#" id="toggleManualFolder" style="color:var(--teal);">Usar campo manual</a>.
           </div>
+          <div id="manualFolderBlock" hidden style="margin-top:10px;">
+            <label>Folder ID do ClickUp</label>
+            <input id="folderIdInput" type="text" placeholder="Ex: 90123456789" />
+            <div class="hint-block">
+              No ClickUp: abra a PASTA (nao a lista) &rarr; "..." &rarr; Copiar link. O numero no
+              final do link costuma ser o mesmo ID da lista dentro dela, nao o da pasta &mdash; por
+              isso o navegador acima e mais confiavel. Colar aqui o ID de uma lista (o mesmo numero
+              que aparece em "lista padrao" abaixo) sempre resulta em erro 404.
+            </div>
+          </div>
+
           <button id="fetchListsBtn" class="secondary" style="margin-top:10px;">Buscar listas dessa pasta</button>
           <div id="foldersMsg" class="msg"></div>
           <div id="listsContainer"></div>
@@ -544,8 +567,89 @@ async function loadLogs() {
   }
 }
 
+// ---- Navegador ClickUp: Workspace -> Space -> Folder (evita colar ID errado) ----
+function currentFolderSelection() {
+  const manualVisible = !$("manualFolderBlock").hidden;
+  if (manualVisible) {
+    const id = $("folderIdInput").value.trim();
+    return id ? { id, name: null } : null;
+  }
+  const sel = $("folderSelect");
+  if (!sel.value) return null;
+  return { id: sel.value, name: sel.selectedOptions[0]?.textContent || null };
+}
+
+function fillSelect(sel, items, placeholder) {
+  sel.innerHTML = "";
+  const opt0 = document.createElement("option");
+  opt0.value = "";
+  opt0.textContent = placeholder;
+  sel.appendChild(opt0);
+  for (const item of items) {
+    const opt = document.createElement("option");
+    opt.value = item.id;
+    opt.textContent = item.name || item.id;
+    sel.appendChild(opt);
+  }
+}
+
+async function loadTeams() {
+  const browseMsg = $("browseMsg");
+  try {
+    const teams = await api("/admin/clickup/teams");
+    fillSelect($("teamSelect"), teams, teams.length ? "Selecione..." : "Nenhum workspace encontrado");
+    $("spaceSelect").disabled = true;
+    $("folderSelect").disabled = true;
+  } catch (e) {
+    browseMsg.textContent = "Erro ao listar workspaces: " + e.message;
+    browseMsg.className = "msg error";
+  }
+}
+
+$("teamSelect").addEventListener("change", async () => {
+  const teamId = $("teamSelect").value;
+  const spaceSel = $("spaceSelect");
+  const folderSel = $("folderSelect");
+  fillSelect(folderSel, [], "Escolha o space primeiro");
+  folderSel.disabled = true;
+  if (!teamId) { fillSelect(spaceSel, [], "Escolha o workspace primeiro"); spaceSel.disabled = true; return; }
+  spaceSel.disabled = true;
+  fillSelect(spaceSel, [], "Carregando...");
+  try {
+    const spaces = await api(`/admin/clickup/teams/${encodeURIComponent(teamId)}/spaces`);
+    fillSelect(spaceSel, spaces, spaces.length ? "Selecione..." : "Nenhum space encontrado");
+    spaceSel.disabled = false;
+  } catch (e) {
+    $("browseMsg").textContent = "Erro ao listar spaces: " + e.message;
+    $("browseMsg").className = "msg error";
+  }
+});
+
+$("spaceSelect").addEventListener("change", async () => {
+  const spaceId = $("spaceSelect").value;
+  const folderSel = $("folderSelect");
+  if (!spaceId) { fillSelect(folderSel, [], "Escolha o space primeiro"); folderSel.disabled = true; return; }
+  folderSel.disabled = true;
+  fillSelect(folderSel, [], "Carregando...");
+  try {
+    const folders = await api(`/admin/clickup/spaces/${encodeURIComponent(spaceId)}/folders`);
+    fillSelect(folderSel, folders, folders.length ? "Selecione..." : "Nenhuma pasta encontrada");
+    folderSel.disabled = false;
+  } catch (e) {
+    $("browseMsg").textContent = "Erro ao listar pastas: " + e.message;
+    $("browseMsg").className = "msg error";
+  }
+});
+
+$("toggleManualFolder").addEventListener("click", (ev) => {
+  ev.preventDefault();
+  const block = $("manualFolderBlock");
+  block.hidden = !block.hidden;
+  ev.target.textContent = block.hidden ? "Usar campo manual" : "Usar o navegador acima";
+});
+
 $("fetchListsBtn").addEventListener("click", async () => {
-  const folderId = $("folderIdInput").value.trim();
+  const selection = currentFolderSelection();
   const msg = $("foldersMsg");
   const container = $("listsContainer");
   selectedList = null;
@@ -553,7 +657,8 @@ $("fetchListsBtn").addEventListener("click", async () => {
   container.innerHTML = "";
   msg.textContent = "";
   msg.className = "msg";
-  if (!folderId) { msg.textContent = "Informe o Folder ID."; msg.className = "msg error"; return; }
+  if (!selection) { msg.textContent = "Escolha uma pasta (ou informe o Folder ID manualmente)."; msg.className = "msg error"; return; }
+  const { id: folderId, name: folderName } = selection;
   try {
     const lists = await api(`/admin/clickup/folders/${encodeURIComponent(folderId)}/lists`);
     if (!lists.length) { msg.textContent = "Nenhuma lista encontrada nessa pasta."; msg.className = "msg error"; return; }
@@ -564,13 +669,13 @@ $("fetchListsBtn").addEventListener("click", async () => {
       div.addEventListener("click", () => {
         document.querySelectorAll(".list-option").forEach(el => el.classList.remove("selected"));
         div.classList.add("selected");
-        selectedList = { id: item.id, name: item.name, folderId, folderName: null };
+        selectedList = { id: item.id, name: item.name, folderId, folderName };
         $("activateBtn").disabled = false;
       });
       container.appendChild(div);
     }
   } catch (e) {
-    msg.textContent = e.message + " (confira se colou o Folder ID da pasta, e nao o ID de uma lista)";
+    msg.textContent = e.message + " (confira se a pasta escolhida realmente tem listas, e nao colou um List ID no campo manual)";
     msg.className = "msg error";
   }
 });
@@ -626,6 +731,7 @@ function showApp() {
   $("app").hidden = false;
   loadFlowStatus();
   loadActiveList();
+  loadTeams();
   setTimeout(layoutNodes, 0);
 }
 

@@ -71,3 +71,63 @@ async def test_folder_lists_raises_on_http_error(monkeypatch):
         await service.get_folder_lists("999")
 
     get_settings.cache_clear()
+
+
+@pytest.mark.asyncio
+async def test_get_teams_returns_workspaces(monkeypatch):
+    monkeypatch.setenv("CLICKUP_TOKEN", "fake-token")
+    get_settings.cache_clear()
+
+    fake_response = _FakeResponse(200, {"teams": [{"id": 1, "name": "Espaco de trabalho Penso"}]})
+    monkeypatch.setattr(httpx, "AsyncClient", lambda *a, **k: _FakeAsyncClient(fake_response))
+
+    service = ClickUpService()
+    teams = await service.get_teams()
+
+    assert teams == [{"id": "1", "name": "Espaco de trabalho Penso"}]
+    get_settings.cache_clear()
+
+
+@pytest.mark.asyncio
+async def test_get_spaces_returns_spaces(monkeypatch):
+    monkeypatch.setenv("CLICKUP_TOKEN", "fake-token")
+    get_settings.cache_clear()
+
+    fake_response = _FakeResponse(200, {"spaces": [{"id": 10, "name": "GSI"}]})
+    monkeypatch.setattr(httpx, "AsyncClient", lambda *a, **k: _FakeAsyncClient(fake_response))
+
+    service = ClickUpService()
+    spaces = await service.get_spaces("1")
+
+    assert spaces == [{"id": "10", "name": "GSI"}]
+    get_settings.cache_clear()
+
+
+@pytest.mark.asyncio
+async def test_get_folders_returns_folders_not_lists(monkeypatch):
+    monkeypatch.setenv("CLICKUP_TOKEN", "fake-token")
+    get_settings.cache_clear()
+
+    fake_response = _FakeResponse(200, {"folders": [{"id": 20, "name": "2026"}]})
+    monkeypatch.setattr(httpx, "AsyncClient", lambda *a, **k: _FakeAsyncClient(fake_response))
+
+    service = ClickUpService()
+    folders = await service.get_folders("10")
+
+    assert folders == [{"id": "20", "name": "2026"}]
+    get_settings.cache_clear()
+
+
+@pytest.mark.asyncio
+async def test_get_folders_raises_on_http_error(monkeypatch):
+    monkeypatch.setenv("CLICKUP_TOKEN", "fake-token")
+    get_settings.cache_clear()
+
+    fake_response = _FakeResponse(401, {})
+    monkeypatch.setattr(httpx, "AsyncClient", lambda *a, **k: _FakeAsyncClient(fake_response))
+
+    service = ClickUpService()
+    with pytest.raises(ClickUpServiceError):
+        await service.get_folders("10")
+
+    get_settings.cache_clear()

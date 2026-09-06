@@ -44,6 +44,13 @@ class ClickUpFolderListItem(BaseModel):
     name: str | None = None
 
 
+class ClickUpBrowseItem(BaseModel):
+    """Item generico para navegacao Workspace -> Space -> Folder no ClickUp (somente leitura)."""
+
+    id: str
+    name: str | None = None
+
+
 class ClickUpFolderSetupRequest(BaseModel):
     """Fluxo simplificado do painel: informar a pasta e a lista escolhida dentro dela.
 
