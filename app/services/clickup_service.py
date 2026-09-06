@@ -58,7 +58,10 @@ class ClickUpService:
             raise ClickUpServiceError("Erro de comunicacao ao criar tarefa no ClickUp.") from None
 
         if response.status_code >= 400:
-            raise ClickUpServiceError(f"Erro ao criar tarefa no ClickUp. HTTP {response.status_code}.")
+            raise ClickUpServiceError(
+                f"Erro ao criar tarefa no ClickUp. HTTP {response.status_code}. "
+                f"{self._extract_error_detail(response)}"
+            )
 
         try:
             data = response.json()
@@ -290,3 +293,27 @@ class ClickUpService:
                     return None
 
         return None
+
+    @staticmethod
+    def _extract_error_detail(response: httpx.Response) -> str:
+        """Extrai a mensagem de erro do corpo de resposta do ClickUp (campo 'err'), quando houver.
+
+        Util para diagnosticar erros 400 (ex.: status invalido para a lista, assignee
+        que nao e membro da lista) sem precisar adivinhar a causa a partir so do HTTP code.
+        Nunca inclui headers (evita vazar token de Authorization).
+        """
+        try:
+            data = response.json()
+        except ValueError:
+            return ""
+
+        if not isinstance(data, dict):
+            return ""
+
+        err = data.get("err") or data.get("error") or data.get("message")
+        ecode = data.get("ECODE")
+        if err and ecode:
+            return f"ClickUp: {err} ({ecode})"
+        if err:
+            return f"ClickUp: {err}"
+        return ""

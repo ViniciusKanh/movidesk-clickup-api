@@ -27,6 +27,9 @@ class _FakeAsyncClient:
     async def get(self, *args, **kwargs):
         return self._response
 
+    async def post(self, *args, **kwargs):
+        return self._response
+
 
 @pytest.mark.asyncio
 async def test_folder_resolves_list(monkeypatch):
@@ -130,4 +133,39 @@ async def test_get_folders_raises_on_http_error(monkeypatch):
     with pytest.raises(ClickUpServiceError):
         await service.get_folders("10")
 
+    get_settings.cache_clear()
+
+
+@pytest.mark.asyncio
+async def test_create_task_error_includes_clickup_detail(monkeypatch):
+    """Erros 400 do ClickUp (ex.: status invalido para a lista) devem trazer o
+    motivo exato no ClickUpServiceError, para aparecer no log sem precisar adivinhar."""
+    monkeypatch.setenv("CLICKUP_TOKEN", "fake-token")
+    get_settings.cache_clear()
+
+    fake_response = _FakeResponse(400, {"err": "Status not found", "ECODE": "ITEM_046"})
+    monkeypatch.setattr(httpx, "AsyncClient", lambda *a, **k: _FakeAsyncClient(fake_response))
+
+    service = ClickUpService()
+    with pytest.raises(ClickUpServiceError) as exc_info:
+        await service.create_task(list_id="999", name="Teste", description="Teste", status="Open")
+
+    assert "Status not found" in str(exc_info.value)
+    assert "ITEM_046" in str(exc_info.value)
+    get_settings.cache_clear()
+
+
+@pytest.mark.asyncio
+async def test_create_task_error_without_detail_still_reports_http_status(monkeypatch):
+    monkeypatch.setenv("CLICKUP_TOKEN", "fake-token")
+    get_settings.cache_clear()
+
+    fake_response = _FakeResponse(500, {})
+    monkeypatch.setattr(httpx, "AsyncClient", lambda *a, **k: _FakeAsyncClient(fake_response))
+
+    service = ClickUpService()
+    with pytest.raises(ClickUpServiceError) as exc_info:
+        await service.create_task(list_id="999", name="Teste", description="Teste")
+
+    assert "HTTP 500" in str(exc_info.value)
     get_settings.cache_clear()
