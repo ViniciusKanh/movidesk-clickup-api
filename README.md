@@ -180,7 +180,7 @@ Crie um `.env` local a partir do `.env.example`. Nunca commite `.env`.
 | `MOVIDESK_REQUIRED_OWNER_ID` | Não | ID do agente responsável exigido. Maior prioridade |
 | `MOVIDESK_REQUIRED_OWNER_EMAIL` | Não | E-mail do responsável exigido (comparado normalizado: trim + lowercase). Usado se `MOVIDESK_REQUIRED_OWNER_ID` estiver vazio |
 | `MOVIDESK_REQUIRED_OWNER_NAME` | Não | Nome do responsável exigido, fallback de último caso. Usado só se os dois acima estiverem vazios |
-| `WEBHOOK_SECRET` | Não | Se definido, exige header `X-Webhook-Secret` |
+| `WEBHOOK_SECRET` | Não | Se definido, exige o segredo via header `X-Webhook-Secret` **ou** query string `?secret=...` (o Movidesk só suporta URL, não cabeçalhos customizados) |
 | `APP_ENV` | Não | `dev`, `staging`, `prod` |
 | `LOG_LEVEL` | Não | Default: `INFO` |
 | `REQUEST_TIMEOUT_SECONDS` | Não | Timeout das chamadas HTTP |
@@ -293,9 +293,9 @@ O projeto inclui `api/index.py` (expõe o `app` FastAPI) e `vercel.json` prontos
 3. Em **Settings > Environment Variables**, cadastre todas as variáveis de `.env.example` com os valores reais, com atenção especial a:
    - `TURSO_DATABASE_URL` e `TURSO_AUTH_TOKEN` — **obrigatórios em produção**. A Vercel não tem disco persistente, então `DATABASE_URL` (SQLite) não funciona lá; o banco efetivo em produção precisa ser o Turso.
    - `ADMIN_USERNAME`, `ADMIN_PASSWORD`, `ADMIN_SESSION_SECRET` — habilitam o painel `/admin/ui`.
-   - `WEBHOOK_SECRET` — configure o mesmo valor no gatilho do Movidesk (header `X-Webhook-Secret`).
+   - `WEBHOOK_SECRET` — a ação "Acionar Webhook" dos gatilhos do Movidesk só tem campo de URL (sem cabeçalhos customizados), então o segredo precisa ir embutido na própria URL: `https://SEU-PROJETO.vercel.app/webhooks/movidesk/clickup?secret=SEU_WEBHOOK_SECRET`. O endpoint aceita tanto esse `?secret=` quanto o header `X-Webhook-Secret` (útil para outros sistemas que suportem cabeçalhos customizados).
 4. Deploy. A API fica disponível em `https://SEU-PROJETO.vercel.app`, com o painel em `https://SEU-PROJETO.vercel.app/admin/ui`.
-5. Configure o webhook do Movidesk para chamar `https://SEU-PROJETO.vercel.app/webhooks/movidesk/clickup`.
+5. No Movidesk, crie um gatilho (Configurações > Automações > Gatilhos) com condição de disparo "Responsável: Alterado" (+ opcionalmente "Responsável: Igual a" o agente desejado, para restringir) e ação "Acionar Webhook" apontando para a URL acima (com `?secret=...` se `WEBHOOK_SECRET` estiver configurado).
 
 > Ative também a **Vercel Deployment Protection** (ou ao menos mantenha o painel só acessível por quem tem usuário/senha) já que a URL fica pública por padrão.
 
@@ -381,22 +381,20 @@ Crie um gatilho em:
 Tickets -> Gatilhos -> Novo gatilho
 ```
 
-Configuração sugerida:
+Configuração sugerida (Configurações > Automações > Gatilhos):
 
 | Campo | Valor |
 | --- | --- |
 | Nome | `Send eligible tickets to ClickUp` |
 | Gatilho para | `Tickets` |
+| Condição (bloco "TODAS") | `Responsável` `Alterado` — condição de disparo; usar "Alterado" e não "Igual a", que só valida na criação do ticket |
+| Condição opcional (mesmo bloco) | `Responsável` `Igual a` `[agente desejado]` — restringe o disparo a esse agente (a API também valida isso de novo com dados atualizados, então é opcional, mas reduz disparos desnecessários) |
 | Ação | `Acionar webhook` |
-| URL | `https://your-api-domain.example/webhooks/movidesk/clickup` |
+| URL | `https://your-api-domain.example/webhooks/movidesk/clickup` (adicione `?secret=[WEBHOOK_SECRET]` se `WEBHOOK_SECRET` estiver configurado) |
 
-Se usar `WEBHOOK_SECRET`, envie o header:
+O Movidesk só oferece o campo de URL nessa ação (sem cabeçalhos HTTP customizados), então o segredo **precisa** ir na própria URL como `?secret=...`. O endpoint aceita esse formato e, alternativamente, o header `X-Webhook-Secret` para outros sistemas que suportem cabeçalhos customizados. Se não usar segredo, deixe `WEBHOOK_SECRET` vazio e a URL sem `?secret=`.
 
-```text
-X-Webhook-Secret: [WEBHOOK_SECRET]
-```
-
-Se não usar segredo, deixe o header vazio.
+Use a aba **Logs** do painel (`/admin/ui`) para conferir, para um ticket específico, exatamente por que a integração criaria ou não uma tarefa — inclusive antes de configurar o gatilho, para validar as regras com dados reais.
 
 ## Endpoints
 
@@ -545,7 +543,7 @@ pytest
 - Nunca commite `.env`.
 - Nunca coloque tokens no README, Dockerfile ou código.
 - Use Secrets/Variables no provedor de deploy.
-- Use `WEBHOOK_SECRET` quando o gatilho permitir header customizado.
+- Use `WEBHOOK_SECRET` sempre que possível; no Movidesk, como a ação de webhook só tem campo de URL, envie o segredo como `?secret=...` na própria URL do gatilho (o endpoint também aceita header `X-Webhook-Secret`, para sistemas que suportem).
 - Proteja rotas `/admin` antes de expor em produção pública.
 - Revise logs para evitar registrar dados sensíveis.
 
