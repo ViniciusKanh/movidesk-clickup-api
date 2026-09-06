@@ -174,7 +174,7 @@ _PAGE = """<!doctype html>
   .card h3 { margin:0 0 4px; font-size:14px; font-weight:600; }
   .card p.hint { color: var(--text-faint); font-size:12px; margin:2px 0 14px; }
   .kv { font-size:13px; color: var(--text-dim); margin:5px 0; display:flex; justify-content:space-between; gap:10px; }
-  .kv b { color: var(--text); font-family: var(--mono); font-weight:500; }
+  .kv b { color: var(--text); font-family: var(--mono); font-weight:500; overflow-wrap:anywhere; word-break:break-all; text-align:right; }
   .list-option {
     display:flex; align-items:center; gap:8px; padding:10px 11px; border:1px solid var(--border);
     border-radius:8px; margin-top:6px; cursor:pointer; font-size:13px; font-family: var(--mono);
