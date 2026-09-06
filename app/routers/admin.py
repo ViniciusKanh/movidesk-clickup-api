@@ -160,7 +160,9 @@ async def test_clickup_connection(_: str = Depends(require_admin_session)) -> Co
     if not user:
         return ConnectionTestResult(ok=False, message="Token rejeitado ou sem permissao (GET /user falhou).")
     label = user.get("username") or user.get("email") or "usuario autenticado"
-    return ConnectionTestResult(ok=True, message=f"Conexao OK - token valido, autenticado como {label}.")
+    user_id = user.get("id")
+    id_hint = f" ID ClickUp: {user_id} - use em CLICKUP_ASSIGNEE_IDS para atribuir tarefas a esse usuario com certeza." if user_id is not None else ""
+    return ConnectionTestResult(ok=True, message=f"Conexao OK - token valido, autenticado como {label}.{id_hint}")
 
 
 # ---------------------------------------------------------------------------

@@ -30,6 +30,17 @@ HIGHLIGHTED_FIELD_NAMES = (
     "[BI] Resultado esperado",
 )
 
+# Emojis usados como icones de secao - dao escaneabilidade visual no ClickUp
+# (que renderiza markdown_description como rich text), sem depender de HTML.
+ICON_SUMMARY = "📋"
+ICON_ORIGIN = "🎫"
+ICON_BI = "🧭"
+ICON_EXTRA = "🗂️"
+ICON_ACTIONS = "🕘"
+ICON_SCOPE = "🎯"
+
+DIVIDER = "---"
+
 
 def build_clickup_task_name(ticket: MovideskTicket) -> str:
     return f"[MOVI-{ticket.id}] {ticket.subject}"[:255]
@@ -62,7 +73,11 @@ def _clip(value: object, limit: int) -> str:
     return f"{text[:limit].rstrip()}...[truncado]"
 
 
-def _section(title: str, body: str | Iterable[str]) -> str:
+def _heading(icon: str, title: str) -> str:
+    return f"## {icon} {title}"
+
+
+def _section(icon: str, title: str, body: str | Iterable[str]) -> str:
     if isinstance(body, str):
         content = body.strip()
     else:
@@ -71,17 +86,14 @@ def _section(title: str, body: str | Iterable[str]) -> str:
     if not content:
         return ""
 
-    return f"""==============================
-{title}
-==============================
-{content}"""
+    return f"{_heading(icon, title)}\n{content}"
 
 
-def _field_lines(pairs: Iterable[tuple[str, object]]) -> list[str]:
+def _bullet_lines(pairs: Iterable[tuple[str, object]]) -> list[str]:
     lines = []
     for label, value in pairs:
         if _is_present(value):
-            lines.append(f"{label}: {_clip(value, MAX_FIELD_VALUE_LENGTH)}")
+            lines.append(f"- **{label}:** {_clip(value, MAX_FIELD_VALUE_LENGTH)}")
     return lines
 
 
@@ -97,7 +109,7 @@ def _custom_field_lines(ticket: MovideskTicket) -> list[str]:
             continue
         if not _is_present(value):
             continue
-        lines.append(f"- {name}: {_clip(value, MAX_FIELD_VALUE_LENGTH)}")
+        lines.append(f"- **{name}:** {_clip(value, MAX_FIELD_VALUE_LENGTH)}")
 
     return lines
 
@@ -108,7 +120,7 @@ def _bi_field_lines(ticket: MovideskTicket) -> list[str]:
         value = get_custom_field(ticket.custom_fields, name)
         if _is_present(value):
             clean_name = name.replace("[BI] ", "")
-            lines.append(f"- {clean_name}: {_clip(value, MAX_FIELD_VALUE_LENGTH)}")
+            lines.append(f"- **{clean_name}:** {_clip(value, MAX_FIELD_VALUE_LENGTH)}")
     return lines
 
 
@@ -117,7 +129,7 @@ def _action_type(value: object) -> str:
     if text == "1":
         return "interna"
     if text == "2":
-        return "publica"
+        return "pública"
     return text
 
 
@@ -132,15 +144,16 @@ def _build_action_line(action: MovideskAction, index: int) -> str:
     if _is_present(action.status):
         meta.append(f"status {_stringify(action.status)}")
 
-    header = f"Acao {index}"
+    header = f"**Ação {index}**"
     if meta:
-        header = f"{header} | {' | '.join(meta)}"
+        header = f"{header} — {' · '.join(meta)}"
 
     description = _clip(action.description, MAX_ACTION_DESCRIPTION_LENGTH)
     if not description:
-        description = "Sem descricao textual retornada pelo Movidesk."
+        description = "Sem descrição textual retornada pelo Movidesk."
 
-    return f"{header}\n{description}"
+    quoted = "\n".join(f"> {line}" if line.strip() else ">" for line in description.split("\n"))
+    return f"{header}\n{quoted}"
 
 
 def _actions_section(ticket: MovideskTicket) -> str:
@@ -164,15 +177,15 @@ def _summary(ticket: MovideskTicket) -> str:
 
     parts = []
     if _is_present(tipo):
-        parts.append(f"Tipo de demanda: {_stringify(tipo)}.")
+        parts.append(f"**Tipo de demanda:** {_stringify(tipo)}")
     if _is_present(dashboard):
-        parts.append(f"Dashboard/projeto envolvido: {_stringify(dashboard)}.")
+        parts.append(f"**Dashboard/projeto envolvido:** {_stringify(dashboard)}")
     if _is_present(area):
-        parts.append(f"Área solicitante: {_stringify(area)}.")
+        parts.append(f"**Área solicitante:** {_stringify(area)}")
     if _is_present(problema):
-        parts.append(f"Problema informado: {_clip(problema, 450)}")
+        parts.append(f"**Problema informado:** {_clip(problema, 450)}")
     if _is_present(resultado):
-        parts.append(f"Resultado esperado: {_clip(resultado, 450)}")
+        parts.append(f"**Resultado esperado:** {_clip(resultado, 450)}")
 
     if not parts:
         return (
@@ -185,7 +198,6 @@ def _summary(ticket: MovideskTicket) -> str:
 
 def build_clickup_description(ticket: MovideskTicket) -> str:
     settings = get_settings()
-    cf = ticket.custom_fields
 
     # So aplica o template se ele realmente tiver o placeholder {ticket_id} - evita
     # mostrar um valor de configuracao incorreto (ex.: um GUID solto) como se fosse link.
@@ -194,12 +206,12 @@ def build_clickup_description(ticket: MovideskTicket) -> str:
     if "{ticket_id}" in template:
         ticket_url = template.format(ticket_id=ticket.id)
 
-    origin_lines = _field_lines(
+    origin_lines = _bullet_lines(
         (
-            ("Ticket Movidesk", ticket.id),
-            ("Link do ticket", ticket_url),
+            ("Ticket Movidesk", f"#{ticket.id}"),
+            ("Link", f"[Abrir no Movidesk]({ticket_url})" if ticket_url else ""),
             ("Assunto", ticket.subject),
-            ("Status Movidesk", ticket.status),
+            ("Status", ticket.status),
             ("Categoria", ticket.category),
             ("Urgência", ticket.urgency),
             ("Tipo", ticket.ticket_type),
@@ -216,24 +228,26 @@ def build_clickup_description(ticket: MovideskTicket) -> str:
     extra_field_lines = _custom_field_lines(ticket)
 
     sections = [
-        _section("RESUMO DA DEMANDA", _summary(ticket)),
-        _section("ORIGEM", origin_lines),
-        _section("DADOS DE BI PREENCHIDOS NO MOVIDESK", bi_lines),
-        _section("OUTROS CAMPOS ADICIONAIS PREENCHIDOS", extra_field_lines),
-        _section("ULTIMAS ACOES DO TICKET", _actions_section(ticket)),
+        _section(ICON_SUMMARY, "Resumo da demanda", _summary(ticket)),
+        _section(ICON_ORIGIN, "Origem", origin_lines),
+        _section(ICON_BI, "Dados de BI preenchidos no Movidesk", bi_lines),
+        _section(ICON_EXTRA, "Outros campos adicionais preenchidos", extra_field_lines),
+        _section(ICON_ACTIONS, "Últimas ações do ticket", _actions_section(ticket)),
         _section(
-            "ESCOPO SUGERIDO",
+            ICON_SCOPE,
+            "Escopo sugerido",
             (
                 "- Validar a necessidade registrada no ticket.",
-                "- Avaliar fontes de dados e regras de negocio envolvidas.",
-                "- Implementar a melhoria solicitada no dashboard, relatorio ou processo informado.",
+                "- Avaliar fontes de dados e regras de negócio envolvidas.",
+                "- Implementar a melhoria solicitada no dashboard, relatório ou processo informado.",
                 "- Testar o resultado com dados reais.",
-                "- Solicitar validacao do solicitante.",
+                "- Solicitar validação do solicitante.",
             ),
         ),
     ]
 
-    return "\n\n".join(section for section in sections if section.strip()) + "\n"
+    non_empty = [section for section in sections if section.strip()]
+    return f"\n\n{DIVIDER}\n\n".join(non_empty) + "\n"
 
 
 def _service_display_name(ticket: MovideskTicket) -> str:

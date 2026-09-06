@@ -17,6 +17,7 @@ class _FakeResponse:
 class _FakeAsyncClient:
     def __init__(self, response: _FakeResponse):
         self._response = response
+        self.last_post_kwargs: dict | None = None
 
     async def __aenter__(self):
         return self
@@ -28,6 +29,7 @@ class _FakeAsyncClient:
         return self._response
 
     async def post(self, *args, **kwargs):
+        self.last_post_kwargs = kwargs
         return self._response
 
 
@@ -168,4 +170,31 @@ async def test_create_task_error_without_detail_still_reports_http_status(monkey
         await service.create_task(list_id="999", name="Teste", description="Teste")
 
     assert "HTTP 500" in str(exc_info.value)
+    get_settings.cache_clear()
+
+
+@pytest.mark.asyncio
+async def test_create_task_payload_includes_markdown_description(monkeypatch):
+    """A descricao deve ir tambem em markdown_description, para o ClickUp renderizar
+    titulos/negrito/citacoes como rich text (nao apenas texto puro)."""
+    monkeypatch.setenv("CLICKUP_TOKEN", "fake-token")
+    get_settings.cache_clear()
+
+    fake_response = _FakeResponse(200, {"id": 1, "url": "https://app.clickup.com/t/1"})
+    fake_clients: list[_FakeAsyncClient] = []
+
+    def _make_client(*a, **k):
+        client = _FakeAsyncClient(fake_response)
+        fake_clients.append(client)
+        return client
+
+    monkeypatch.setattr(httpx, "AsyncClient", _make_client)
+
+    service = ClickUpService()
+    await service.create_task(list_id="999", name="Teste", description="## Titulo\n**negrito**")
+
+    assert len(fake_clients) == 1
+    payload = fake_clients[0].last_post_kwargs["json"]
+    assert payload["markdown_description"] == "## Titulo\n**negrito**"
+    assert payload["description"] == "## Titulo\n**negrito**"
     get_settings.cache_clear()

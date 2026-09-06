@@ -338,6 +338,15 @@ class IntegrationService:
         return None
 
     async def _resolve_clickup_assignee_ids(self, list_id: str) -> list[int]:
+        """Resolve quem deve ser o assignee da tarefa no ClickUp.
+
+        Ordem de precedencia: CLICKUP_ASSIGNEE_IDS (explicito) -> CLICKUP_ASSIGNEE_EMAIL
+        (busca o membro na lista) -> CLICKUP_ASSIGN_AUTHORIZED_USER (usa o dono do token).
+
+        Se nenhuma dessas resolver um ID, a tarefa e criada SEM assignee - isso nao e
+        um erro (pode ser intencional), mas registramos um aviso no log para que a
+        causa fique visivel em vez de o usuario descobrir so ao abrir a tarefa.
+        """
         configured_ids = self._parse_assignee_ids(self.settings.clickup_assignee_ids)
         if configured_ids:
             return configured_ids
@@ -347,6 +356,12 @@ class IntegrationService:
             member_id = await self.clickup.get_list_member_id_by_email(list_id, wanted_email)
             if member_id:
                 return [member_id]
+            logger.warning(
+                "CLICKUP_ASSIGNEE_EMAIL=%s configurado, mas nenhum membro com esse "
+                "e-mail foi encontrado na lista %s do ClickUp.",
+                wanted_email,
+                list_id,
+            )
 
         if self.settings.clickup_assign_authorized_user:
             user = await self.clickup.get_authorized_user()
@@ -357,6 +372,25 @@ class IntegrationService:
                         return [int(user["id"])]
                     except (TypeError, ValueError):
                         return []
+                logger.warning(
+                    "CLICKUP_ASSIGN_AUTHORIZED_USER=true, mas o e-mail do token "
+                    "ClickUp (%s) nao bate com CLICKUP_ASSIGNEE_EMAIL (%s) - "
+                    "assignee nao foi definido. Use CLICKUP_ASSIGNEE_IDS para "
+                    "atribuir por ID diretamente, sem depender de e-mail.",
+                    user_email or "desconhecido",
+                    wanted_email,
+                )
+            else:
+                logger.warning(
+                    "CLICKUP_ASSIGN_AUTHORIZED_USER=true, mas nao foi possivel "
+                    "obter o usuario autenticado do token ClickUp."
+                )
+        elif not configured_ids and not wanted_email:
+            logger.info(
+                "Nenhuma configuracao de assignee definida (CLICKUP_ASSIGNEE_IDS, "
+                "CLICKUP_ASSIGNEE_EMAIL ou CLICKUP_ASSIGN_AUTHORIZED_USER) - a "
+                "tarefa sera criada sem responsavel no ClickUp."
+            )
 
         return []
 

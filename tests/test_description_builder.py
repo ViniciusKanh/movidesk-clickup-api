@@ -8,7 +8,7 @@ def test_task_name_contains_ticket_id_and_subject():
     assert build_clickup_task_name(ticket) == "[MOVI-123456] Analytics request"
 
 
-def test_description_is_plain_text_without_markdown_headers():
+def test_description_uses_markdown_headings_and_bullets():
     ticket = MovideskTicket(
         raw={},
         id=123456,
@@ -36,13 +36,14 @@ def test_description_is_plain_text_without_markdown_headers():
         ],
     )
     description = build_clickup_description(ticket)
-    assert "RESUMO DA DEMANDA" in description
-    assert "##" not in description
-    assert "Ticket Movidesk: 123456" in description
-    assert "Área solicitante: Operations." in description
-    assert "DADOS DE BI PREENCHIDOS NO MOVIDESK" in description
-    assert "Additional field: Relevant extra value" in description
-    assert "ULTIMAS ACOES DO TICKET" in description
+
+    assert "## 📋 Resumo da demanda" in description
+    assert "## 🎫 Origem" in description
+    assert "**Ticket Movidesk:** #123456" in description
+    assert "**Área solicitante:** Operations" in description
+    assert "## 🧭 Dados de BI preenchidos no Movidesk" in description
+    assert "**Additional field:** Relevant extra value" in description
+    assert "## 🕘 Últimas ações do ticket" in description
     assert "Ticket action registered for the analytics team." in description
     assert "[Não informado]" not in description
     assert "CHECKLIST TECNICO" not in description
@@ -64,11 +65,11 @@ def test_description_includes_richer_movidesk_fields():
     )
     description = build_clickup_description(ticket)
 
-    assert "Categoria: Incidente" in description
-    assert "Urgência: 3 - Médio" in description
-    assert "Data de abertura: 2026-09-02T10:42:00" in description
-    assert "Equipe responsável: GSI-DEV" in description
-    assert "Tags: #Filho, #Escalation_GSI" in description
+    assert "**Categoria:** Incidente" in description
+    assert "**Urgência:** 3 - Médio" in description
+    assert "**Data de abertura:** 2026-09-02T10:42:00" in description
+    assert "**Equipe responsável:** GSI-DEV" in description
+    assert "**Tags:** #Filho, #Escalation_GSI" in description
 
 
 def test_ticket_url_ignores_misconfigured_template_without_placeholder(monkeypatch):
@@ -82,7 +83,7 @@ def test_ticket_url_ignores_misconfigured_template_without_placeholder(monkeypat
 
     get_settings.cache_clear()
     assert "d034f39e" not in description
-    assert "Link do ticket" not in description
+    assert "**Link:**" not in description
 
 
 def test_ticket_url_applies_valid_template(monkeypatch):
@@ -93,4 +94,10 @@ def test_ticket_url_applies_valid_template(monkeypatch):
     description = build_clickup_description(ticket)
 
     get_settings.cache_clear()
-    assert "Link do ticket: https://penso.movidesk.com/Ticket/Edit/748598" in description
+    assert "[Abrir no Movidesk](https://penso.movidesk.com/Ticket/Edit/748598)" in description
+
+
+def test_sections_are_separated_by_divider():
+    ticket = MovideskTicket(raw={}, id=1, subject="Teste", requester_name="Alguem")
+    description = build_clickup_description(ticket)
+    assert "\n\n---\n\n" in description

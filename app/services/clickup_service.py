@@ -43,6 +43,11 @@ class ClickUpService:
         }
         payload = {
             "name": name,
+            # markdown_description faz o ClickUp renderizar titulos (##), negrito (**),
+            # citacoes (>) e divisores (---) como rich text de verdade na tarefa.
+            # description (texto puro) fica como fallback para clientes que nao leem
+            # o campo markdown.
+            "markdown_description": description,
             "description": description,
             "tags": tags or ["movidesk", "bi", "melhoria-projeto"],
         }
