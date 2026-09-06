@@ -24,6 +24,36 @@ class MovideskService:
     def __init__(self) -> None:
         self.settings = get_settings()
 
+    async def test_connection(self) -> str:
+        """Verifica se o token/URL do Movidesk respondem, sem consultar nenhum ticket especifico.
+
+        SOMENTE LEITURA: faz um unico GET /tickets com $top=1 (apenas para checar
+        autenticacao e conectividade). Nao cria, altera nem exclui nada.
+        Retorna uma mensagem curta de sucesso, ou levanta MovideskServiceError.
+        """
+        if not self.settings.movidesk_token:
+            raise MovideskServiceError("MOVIDESK_TOKEN nao configurado.")
+
+        url = f"{self.settings.movidesk_base_url.rstrip('/')}/tickets"
+        params = {
+            "token": self.settings.movidesk_token,
+            "$top": 1,
+            "$select": "id",
+        }
+
+        try:
+            async with httpx.AsyncClient(timeout=self.settings.request_timeout_seconds) as client:
+                response = await client.get(url, params=params)
+        except httpx.HTTPError:
+            raise MovideskServiceError("Erro de comunicacao ao conectar no Movidesk.") from None
+
+        if response.status_code in (401, 403):
+            raise MovideskServiceError(f"Token do Movidesk rejeitado. HTTP {response.status_code}.")
+        if response.status_code >= 400:
+            raise MovideskServiceError(f"Erro ao conectar no Movidesk. HTTP {response.status_code}.")
+
+        return "Conexao OK - token valido, API do Movidesk respondeu."
+
     async def get_ticket(self, ticket_id: int) -> MovideskTicket:
         if not self.settings.movidesk_token:
             raise MovideskServiceError("MOVIDESK_TOKEN nao configurado.")

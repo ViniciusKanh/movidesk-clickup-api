@@ -89,6 +89,13 @@ class IntegrationsStatusResponse(BaseModel):
     clickup: ClickUpIntegrationStatus
 
 
+class ConnectionTestResult(BaseModel):
+    """Resultado de um teste de conexao (sempre via GET, nunca escreve nada)."""
+
+    ok: bool
+    message: str
+
+
 class IntegrationLogResponse(BaseModel):
     id: int
     ticket_id: int | None

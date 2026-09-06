@@ -9,150 +9,319 @@ _PAGE = """<!doctype html>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>ViniciusFlow</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
 <style>
-  :root { color-scheme: light; }
+  :root {
+    color-scheme: dark;
+    --bg: #14151a;
+    --surface: #1b1d24;
+    --surface-2: #22242c;
+    --border: #2b2e37;
+    --border-soft: #22242c;
+    --text: #eceef2;
+    --text-dim: #888ca0;
+    --text-faint: #5c5f6e;
+    --violet: #9b8afb;
+    --violet-dim: rgba(155,138,251,.13);
+    --teal: #29d3b0;
+    --teal-dim: rgba(41,211,176,.13);
+    --amber: #f5a623;
+    --amber-dim: rgba(245,166,35,.13);
+    --coral: #ff6b5d;
+    --coral-dim: rgba(255,107,93,.13);
+    --radius: 10px;
+    --sans: "Space Grotesk", system-ui, -apple-system, sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  }
   * { box-sizing: border-box; }
-  body { margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background:#0f1117; color:#e7e9ee; }
+  body { margin:0; font-family: var(--sans); background: var(--bg); color: var(--text); }
   [hidden] { display:none !important; }
+  ::selection { background: var(--violet-dim); color: var(--text); }
+  :focus-visible { outline: 2px solid var(--violet); outline-offset: 2px; }
 
-  /* ---- Login ---- */
-  #loginScreen { max-width:360px; margin:100px auto; background:#171a23; border:1px solid #262b38; border-radius:12px; padding:28px; }
-  #loginScreen h1 { font-size:18px; margin:0 0 4px; }
-  #loginScreen p.sub { color:#8b93a7; font-size:13px; margin:0 0 18px; }
-  label { display:block; font-size:12px; margin:12px 0 4px; color:#9aa3b8; }
-  input[type=text], input[type=password] { width:100%; padding:10px 11px; border:1px solid #2b303e; border-radius:8px; font-size:14px; background:#0f1117; color:#e7e9ee; }
-  input:focus { outline:2px solid #5b7cff; border-color:#5b7cff; }
-  button { background:#5b7cff; color:#fff; border:none; padding:10px 16px; border-radius:8px; font-size:14px; cursor:pointer; font-weight:600; }
-  button.secondary { background:#232838; color:#e7e9ee; }
-  button.ghost { background:transparent; color:#9aa3b8; border:1px solid #2b303e; }
-  button:disabled { opacity:.45; cursor:not-allowed; }
-  .msg { font-size:13px; margin-top:10px; }
-  .msg.error { color:#ff6b6b; }
-  .msg.success { color:#4ade80; }
+  label { display:block; font-size:12.5px; margin:14px 0 6px; color: var(--text-dim); }
+  input[type=text], input[type=password] {
+    width:100%; padding:11px 12px; border:1px solid var(--border); border-radius:8px;
+    font-size:14px; background: var(--bg); color: var(--text); font-family: var(--sans);
+  }
+  input::placeholder { color: var(--text-faint); }
+  input[type=text]:focus, input[type=password]:focus { border-color: var(--violet); }
 
-  /* ---- App shell ---- */
-  #app { display:flex; height:100vh; }
-  nav.sidebar { width:210px; flex-shrink:0; background:#12141c; border-right:1px solid #20242f; padding:18px 12px; display:flex; flex-direction:column; }
-  nav.sidebar .brand { font-weight:700; font-size:15px; padding:0 8px 18px; display:flex; align-items:center; gap:8px; }
-  nav.sidebar .brand .dot { width:9px; height:9px; border-radius:50%; background:#5b7cff; box-shadow:0 0 8px #5b7cff; }
-  nav.sidebar button.tab { display:flex; align-items:center; gap:10px; width:100%; text-align:left; background:transparent; color:#9aa3b8; border:none; padding:10px 10px; border-radius:8px; font-size:13px; font-weight:500; margin-bottom:2px; cursor:pointer; }
-  nav.sidebar button.tab:hover { background:#1c202c; color:#e7e9ee; }
-  nav.sidebar button.tab.active { background:#1c2338; color:#fff; }
+  button { font-family: var(--sans); border:none; border-radius:8px; font-size:14px; cursor:pointer; font-weight:600; }
+  button.primary { background: var(--violet); color:#100e1c; padding:11px 18px; }
+  button.primary:hover { filter:brightness(1.08); }
+  button.secondary { background: var(--surface-2); color: var(--text); border:1px solid var(--border); padding:9px 14px; }
+  button.secondary:hover { border-color: var(--teal); }
+  button.ghost { background:transparent; color: var(--text-dim); border:1px solid var(--border); padding:9px 14px; }
+  button.ghost:hover { color: var(--text); border-color: var(--text-dim); }
+  button.tiny { padding:6px 11px; font-size:12px; }
+  button:disabled { opacity:.4; cursor:not-allowed; }
+
+  .msg { font-size:13px; margin-top:10px; font-family: var(--mono); }
+  .msg.error { color: var(--coral); }
+  .msg.success { color: var(--teal); }
+  .hint-block { font-size:11.5px; color: var(--text-faint); line-height:1.5; margin-top:8px; }
+
+  svg.icon { width:18px; height:18px; stroke:currentColor; fill:none; stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round; flex-shrink:0; }
+
+  /* ---- Marca ---- */
+  .mark { width:30px; height:30px; border-radius:8px; background: var(--surface-2); border:1px solid var(--border);
+    display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .mark svg { width:16px; height:16px; }
+  .mark .dot-a { fill: var(--violet); }
+  .mark .dot-b { fill: var(--teal); }
+  .mark .wire { stroke: var(--text-faint); stroke-width:1.4; }
+
+  /* ================= Login (layout partido) ================= */
+  #loginScreen { min-height:100vh; display:flex; }
+  .login-rail {
+    flex:0 0 38%; max-width:420px; background: var(--surface);
+    border-right:1px solid var(--border); padding:48px 40px; display:flex; flex-direction:column;
+  }
+  .login-rail .brand-row { display:flex; align-items:center; gap:10px; font-weight:600; font-size:16px; }
+  .login-rail .rail-spacer { flex:1; min-height:40px; }
+  .login-schema { display:flex; align-items:center; gap:0; margin:8px 0 18px; }
+  .login-schema .node-chip {
+    display:flex; align-items:center; gap:8px; padding:9px 12px; border:1px solid var(--border);
+    border-radius:8px; background: var(--bg); font-family: var(--mono); font-size:12px;
+  }
+  .login-schema .node-chip .swatch { width:8px; height:8px; border-radius:50%; }
+  .login-schema .node-chip.src .swatch { background: var(--violet); }
+  .login-schema .node-chip.dst .swatch { background: var(--teal); }
+  .login-schema .wire { flex:1; height:1px; background: var(--border); min-width:22px; position:relative; }
+  .login-rail .rail-caption { font-family: var(--mono); font-size:12px; color: var(--text-dim); line-height:1.7; }
+  .login-rail .rail-caption .line { display:block; }
+  .login-rail .rail-caption .ok { color: var(--teal); }
+  .login-rail .rail-caption .lock { color: var(--violet); }
+  .login-rail .rail-foot { font-size:11.5px; color: var(--text-faint); margin-top:auto; padding-top:24px; }
+
+  .login-main { flex:1; display:flex; align-items:center; justify-content:center; padding:24px; }
+  .login-form { width:100%; max-width:320px; }
+  .login-form h1 { font-size:22px; margin:0 0 6px; font-weight:600; }
+  .login-form p.sub { color: var(--text-dim); font-size:13.5px; margin:0 0 8px; }
+  .login-form button.primary { width:100%; margin-top:20px; padding:12px; font-size:14.5px; }
+
+  /* ================= App shell ================= */
+  #app { display:flex; min-height:100vh; }
+  nav.sidebar {
+    width:216px; flex-shrink:0; background: var(--surface); border-right:1px solid var(--border);
+    padding:20px 12px; display:flex; flex-direction:column;
+  }
+  nav.sidebar .brand { font-weight:600; font-size:14.5px; padding:2px 8px 20px; display:flex; align-items:center; gap:9px; }
+  nav.sidebar button.tab {
+    display:flex; align-items:center; gap:11px; width:100%; text-align:left; background:transparent;
+    color: var(--text-dim); border:none; padding:9px 10px; border-radius:8px; font-size:13.5px;
+    font-weight:500; margin-bottom:2px; cursor:pointer; font-family: var(--sans);
+  }
+  nav.sidebar button.tab:hover { background: var(--surface-2); color: var(--text); }
+  nav.sidebar button.tab.active { background: var(--violet-dim); color: var(--violet); }
   nav.sidebar .spacer { flex:1; }
-  nav.sidebar .logout { margin-top:8px; }
 
-  main.content { flex:1; overflow:auto; padding:26px 32px; }
-  header.top { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:20px; }
-  header.top h2 { margin:0; font-size:19px; }
-  header.top p { margin:2px 0 0; color:#8b93a7; font-size:13px; }
+  main.content { flex:1; overflow:auto; padding:32px 40px; max-width:1180px; }
+  header.top { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:22px; }
+  header.top h2 { margin:0; font-size:20px; font-weight:600; }
+  header.top p { margin:3px 0 0; color: var(--text-dim); font-size:13.5px; }
 
-  /* ---- Fluxo (canvas estilo n8n) ---- */
-  .canvas { position:relative; background:
-      radial-gradient(circle, #1c2030 1px, transparent 1px) 0 0/18px 18px;
-    background-color:#12141c; border:1px solid #20242f; border-radius:14px; padding:60px 40px; min-height:260px; }
-  .flow-row { display:flex; align-items:center; gap:0; position:relative; }
-  .node { position:relative; z-index:1; width:250px; background:#181c28; border:1px solid #2b303e; border-radius:12px; padding:16px; cursor:pointer; transition:border-color .15s; }
-  .node:hover { border-color:#5b7cff; }
-  .node .node-head { display:flex; align-items:center; gap:10px; margin-bottom:8px; }
-  .node .icon { width:32px; height:32px; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:16px; flex-shrink:0; }
-  .node.movidesk .icon { background:#2a1f3d; color:#c084fc; }
-  .node.clickup .icon { background:#1f2f26; color:#4ade80; }
-  .node .title { font-weight:600; font-size:14px; }
-  .node .kind { font-size:10px; text-transform:uppercase; letter-spacing:.04em; color:#6b7386; }
-  .node .desc { font-size:12.5px; color:#aab1c2; line-height:1.5; }
-  .node .badge-row { margin-top:10px; display:flex; gap:6px; flex-wrap:wrap; }
-  .badge { font-size:10.5px; padding:3px 8px; border-radius:999px; font-weight:600; }
-  .badge.readonly { background:#2a2540; color:#c4b5fd; }
-  .badge.createonly { background:#1c3324; color:#86efac; }
-  .badge.ok { background:#1c3324; color:#86efac; }
-  .badge.warn { background:#3d2f14; color:#fbbf24; }
-  .connector { flex:1; height:2px; background:linear-gradient(90deg,#2b303e,#5b7cff); position:relative; min-width:60px; }
-  .connector::after { content:"\\25B8"; position:absolute; right:-2px; top:50%; transform:translateY(-50%); color:#5b7cff; font-size:14px; }
-  .safety-banner { margin-top:22px; background:#151b14; border:1px solid #2a3d26; color:#9ae6b4; border-radius:10px; padding:12px 16px; font-size:12.5px; line-height:1.6; }
-  .safety-banner b { color:#c6f6d5; }
+  /* ---- Fluxo: canvas estilo n8n (nos arrastaveis) ---- */
+  .canvas {
+    position:relative; background-image: radial-gradient(circle, var(--border-soft) 1px, transparent 1px);
+    background-size:20px 20px; background-color: var(--surface); border:1px solid var(--border);
+    border-radius:var(--radius); height:280px; overflow:hidden;
+  }
+  .wire-svg { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
+  .wire-svg .pulse-dot { fill: var(--teal); filter:drop-shadow(0 0 4px var(--teal)); }
+  @media (prefers-reduced-motion: reduce) { .wire-svg .pulse-dot { display:none; } }
 
-  /* ---- Panels (config abaixo do canvas) ---- */
-  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:18px; margin-top:22px; }
-  .card { background:#181c28; border:1px solid #2b303e; border-radius:12px; padding:20px; }
-  .card h3 { margin:0 0 4px; font-size:14px; }
-  .card p.hint { color:#7d8598; font-size:12px; margin:2px 0 12px; }
-  .kv { font-size:13px; color:#c7cce0; margin:4px 0; }
-  .kv b { color:#fff; }
-  .list-option { display:flex; align-items:center; gap:8px; padding:9px 10px; border:1px solid #2b303e; border-radius:8px; margin-top:6px; cursor:pointer; font-size:13px; }
-  .list-option.selected { border-color:#5b7cff; background:#1c2338; }
+  .node {
+    position:absolute; z-index:1; width:250px; background: var(--bg); border:1px solid var(--border);
+    border-left:3px solid var(--border); border-radius:8px; padding:14px 16px; user-select:none;
+  }
+  .node.dragging { border-color: var(--violet); box-shadow:0 8px 24px rgba(0,0,0,.35); z-index:2; }
+  .node.movidesk { border-left-color: var(--violet); }
+  .node.clickup { border-left-color: var(--teal); }
+  .node .node-head { display:flex; align-items:center; gap:10px; margin-bottom:8px; cursor:grab; }
+  .node .node-head:active { cursor:grabbing; }
+  .node .node-head svg.icon { width:16px; height:16px; }
+  .node.movidesk .node-head svg.icon { color: var(--violet); }
+  .node.clickup .node-head svg.icon { color: var(--teal); }
+  .node .title { font-weight:600; font-size:13.5px; }
+  .node .kind { font-family: var(--mono); font-size:10px; color: var(--text-faint); }
+  .node .desc { font-size:12px; color: var(--text-dim); line-height:1.5; }
+  .node .badge-row { margin-top:8px; }
+  .canvas-hint {
+    position:absolute; left:16px; bottom:12px; font-family: var(--mono); font-size:10.5px;
+    color: var(--text-faint); pointer-events:none;
+  }
+
+  .safety-banner {
+    margin-top:16px; background: var(--teal-dim); border:1px solid rgba(41,211,176,.28); color: var(--text);
+    border-radius:8px; padding:13px 16px; font-size:12.5px; line-height:1.65;
+  }
+  .safety-banner strong { color: var(--teal); font-family: var(--mono); font-weight:600; }
+
+  /* ---- Paineis abaixo do canvas ---- */
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:20px; }
+  .card { background: var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:20px; }
+  .card h3 { margin:0 0 4px; font-size:14px; font-weight:600; }
+  .card p.hint { color: var(--text-faint); font-size:12px; margin:2px 0 14px; }
+  .kv { font-size:13px; color: var(--text-dim); margin:5px 0; display:flex; justify-content:space-between; gap:10px; }
+  .kv b { color: var(--text); font-family: var(--mono); font-weight:500; }
+  .list-option {
+    display:flex; align-items:center; gap:8px; padding:10px 11px; border:1px solid var(--border);
+    border-radius:8px; margin-top:6px; cursor:pointer; font-size:13px; font-family: var(--mono);
+  }
+  .list-option:hover { border-color: var(--text-dim); }
+  .list-option.selected { border-color: var(--teal); background: var(--teal-dim); color: var(--teal); }
+
+  /* ---- Badges (codificam status, nao decoram) ---- */
+  .badge { font-size:10.5px; padding:3px 8px; border-radius:5px; font-weight:600; font-family: var(--mono); }
+  .badge.readonly { background: var(--violet-dim); color: var(--violet); }
+  .badge.createonly { background: var(--teal-dim); color: var(--teal); }
+  .badge.ok { background: var(--teal-dim); color: var(--teal); }
+  .badge.warn { background: var(--amber-dim); color: var(--amber); }
+  .badge.down { background: var(--coral-dim); color: var(--coral); }
 
   /* ---- Integracoes ---- */
-  .integration-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(260px,1fr)); gap:16px; }
-  .integration-card { background:#181c28; border:1px solid #2b303e; border-radius:12px; padding:18px; }
-  .integration-card.disabled { opacity:.5; border-style:dashed; display:flex; align-items:center; justify-content:center; min-height:150px; font-size:13px; color:#7d8598; }
-  .integration-card .head { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
-  .integration-card .head .icon { width:34px; height:34px; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:17px; }
-  .integration-card.movidesk .icon { background:#2a1f3d; color:#c084fc; }
-  .integration-card.clickup .icon { background:#1f2f26; color:#4ade80; }
-  .integration-card h4 { margin:0; font-size:14px; }
+  .integration-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(280px,1fr)); gap:16px; }
+  .integration-card { background: var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:18px; }
+  .integration-card.disabled {
+    opacity:.55; border-style:dashed; display:flex; align-items:center; justify-content:center;
+    min-height:170px; font-size:13px; color: var(--text-faint); font-family: var(--mono);
+  }
+  .integration-card .head { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
+  .integration-card .head .head-left { display:flex; align-items:center; gap:10px; }
+  .integration-card .head svg.icon { width:18px; height:18px; }
+  .integration-card.movidesk .head svg.icon { color: var(--violet); }
+  .integration-card.clickup .head svg.icon { color: var(--teal); }
+  .integration-card h4 { margin:0; font-size:14.5px; font-weight:600; }
   .integration-card .kv { font-size:12.5px; }
+  .integration-card .test-row { margin-top:14px; padding-top:14px; border-top:1px dashed var(--border); display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  .status-pill { font-family: var(--mono); font-size:11.5px; padding:4px 10px; border-radius:999px; background: var(--surface-2); color: var(--text-faint); }
+  .status-pill.ok { background: var(--teal-dim); color: var(--teal); }
+  .status-pill.down { background: var(--coral-dim); color: var(--coral); }
+  .status-pill.checking { background: var(--amber-dim); color: var(--amber); }
 
-  /* ---- Tabela de logs ---- */
+  /* ---- Tabelas ---- */
   table { width:100%; border-collapse:collapse; font-size:13px; }
-  th, td { text-align:left; padding:8px 10px; border-bottom:1px solid #20242f; }
-  th { color:#7d8598; font-weight:600; font-size:11.5px; text-transform:uppercase; letter-spacing:.03em; }
+  th, td { text-align:left; padding:9px 10px; border-bottom:1px solid var(--border-soft); }
+  td { font-family: var(--mono); font-size:12.5px; color: var(--text-dim); }
+  th { color: var(--text-faint); font-weight:600; font-size:11px; letter-spacing:.02em; font-family: var(--sans); }
+
+  @media (max-width: 860px) {
+    #loginScreen { flex-direction:column; }
+    .login-rail { flex:none; max-width:none; padding:28px 24px; }
+    .login-rail .rail-spacer { min-height:16px; }
+    .login-main { padding:32px 24px; }
+    #app { flex-direction:column; }
+    nav.sidebar { width:auto; flex-direction:row; align-items:center; padding:12px 14px; overflow-x:auto; }
+    nav.sidebar .brand { padding:0 12px 0 0; }
+    nav.sidebar .spacer { display:none; }
+    main.content { padding:22px 18px; }
+    .grid2 { grid-template-columns:1fr; }
+    .canvas { height:auto; padding:16px; }
+    .wire-svg { display:none; }
+    .canvas-hint { display:none; }
+    .node { position:static !important; width:100%; margin-bottom:12px; }
+    .node .node-head { cursor:default; }
+  }
 </style>
 </head>
 <body>
 
 <div id="loginScreen">
-  <h1>ViniciusFlow</h1>
-  <p class="sub">Movidesk &rarr; ClickUp</p>
-  <label>Usuario</label>
-  <input id="loginUser" type="text" autocomplete="username" />
-  <label>Senha</label>
-  <input id="loginPass" type="password" autocomplete="current-password" />
-  <button id="loginBtn" style="width:100%; margin-top:16px;">Entrar</button>
-  <div id="loginMsg" class="msg"></div>
+  <div class="login-rail">
+    <div class="brand-row">
+      <span class="mark"><svg viewBox="0 0 24 24"><circle class="dot-a" cx="6" cy="12" r="2.6"/><line class="wire" x1="8.6" y1="12" x2="15.4" y2="12"/><circle class="dot-b" cx="18" cy="12" r="2.6"/></svg></span>
+      ViniciusFlow
+    </div>
+    <div class="rail-spacer"></div>
+    <div class="login-schema">
+      <div class="node-chip src"><span class="swatch"></span>movidesk</div>
+      <div class="wire"></div>
+      <div class="node-chip dst"><span class="swatch"></span>clickup</div>
+    </div>
+    <div class="rail-caption">
+      <span class="line"><span class="lock">&#9679;</span> Movidesk: acesso somente leitura</span>
+      <span class="line"><span class="ok">&#9679;</span> ClickUp: cria tarefas, nunca edita</span>
+    </div>
+    <div class="rail-foot">Penso Tecnologia &middot; integracao interna</div>
+  </div>
+  <div class="login-main">
+    <div class="login-form">
+      <h1>Entrar</h1>
+      <p class="sub">Acesso ao painel da integracao.</p>
+      <label>Usuario</label>
+      <input id="loginUser" type="text" autocomplete="username" placeholder="seu.usuario@penso.com.br" />
+      <label>Senha</label>
+      <input id="loginPass" type="password" autocomplete="current-password" placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;" />
+      <button id="loginBtn" class="primary">Entrar</button>
+      <div id="loginMsg" class="msg"></div>
+    </div>
+  </div>
 </div>
 
 <div id="app" hidden>
   <nav class="sidebar">
-    <div class="brand"><span class="dot"></span> ViniciusFlow</div>
-    <button class="tab active" data-tab="fluxo">&#9881; Fluxo</button>
-    <button class="tab" data-tab="integracoes">&#128268; Integracoes</button>
-    <button class="tab" data-tab="logs">&#128203; Logs</button>
+    <div class="brand">
+      <span class="mark"><svg viewBox="0 0 24 24"><circle class="dot-a" cx="6" cy="12" r="2.6"/><line class="wire" x1="8.6" y1="12" x2="15.4" y2="12"/><circle class="dot-b" cx="18" cy="12" r="2.6"/></svg></span>
+      ViniciusFlow
+    </div>
+    <button class="tab active" data-tab="fluxo">
+      <svg class="icon" viewBox="0 0 24 24"><circle cx="5" cy="12" r="2"/><circle cx="19" cy="6" r="2"/><circle cx="19" cy="18" r="2"/><path d="M7 12h4M11 12l6-5M11 12l6 5"/></svg>
+      Fluxo
+    </button>
+    <button class="tab" data-tab="integracoes">
+      <svg class="icon" viewBox="0 0 24 24"><path d="M9 2v4M15 2v4M6 8h12l-1 5a5 5 0 0 1-10 0L6 8Z"/><path d="M12 17v5"/></svg>
+      Integracoes
+    </button>
+    <button class="tab" data-tab="logs">
+      <svg class="icon" viewBox="0 0 24 24"><path d="M6 4h12v16l-3-2-3 2-3-2-3 2V4Z"/><path d="M9 9h6M9 13h6"/></svg>
+      Logs
+    </button>
     <div class="spacer"></div>
-    <button class="tab logout ghost" id="logoutBtn">&#8592; Sair</button>
+    <button class="tab ghost" id="logoutBtn">
+      <svg class="icon" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
+      Sair
+    </button>
   </nav>
 
   <main class="content">
 
     <section id="view-fluxo">
       <header class="top">
-        <div><h2>Fluxo</h2><p>Movidesk (leitura) &rarr; ClickUp (criacao de tarefa)</p></div>
+        <div><h2>Fluxo</h2><p>Movidesk (leitura) &rarr; ClickUp (criacao de tarefa) &mdash; arraste os nos para reorganizar</p></div>
       </header>
 
-      <div class="canvas">
-        <div class="flow-row">
-          <div class="node movidesk" id="nodeMovidesk">
-            <div class="node-head">
-              <div class="icon">&#128218;</div>
-              <div><div class="title">Movidesk</div><div class="kind">Gatilho</div></div>
-            </div>
-            <div class="desc" id="movideskNodeDesc">Carregando regra de responsavel...</div>
-            <div class="badge-row"><span class="badge readonly">somente leitura</span></div>
+      <div class="canvas" id="flowCanvas">
+        <svg class="wire-svg" id="wireSvg"><path id="wirePath" fill="none" stroke="#29d3b0" stroke-width="1.4"/><circle class="pulse-dot" r="3.4"><animateMotion id="wireMotion" dur="3s" repeatCount="indefinite" path="M0,0" /></circle></svg>
+
+        <div class="node movidesk" id="nodeMovidesk">
+          <div class="node-head" data-drag-handle>
+            <svg class="icon" viewBox="0 0 24 24"><path d="M4 5h16v11H8l-4 4V5Z"/><path d="M8 9h8M8 12h5"/></svg>
+            <div><div class="title">Movidesk</div><div class="kind">gatilho / origem</div></div>
           </div>
-          <div class="connector"></div>
-          <div class="node clickup" id="nodeClickup">
-            <div class="node-head">
-              <div class="icon">&#9989;</div>
-              <div><div class="title">ClickUp</div><div class="kind">Acao</div></div>
-            </div>
-            <div class="desc" id="clickupNodeDesc">Carregando lista ativa...</div>
-            <div class="badge-row"><span class="badge createonly">so cria tarefas</span></div>
+          <div class="desc" id="movideskNodeDesc">Carregando regra de responsavel...</div>
+          <div class="badge-row"><span class="badge readonly">somente leitura</span></div>
+        </div>
+
+        <div class="node clickup" id="nodeClickup">
+          <div class="node-head" data-drag-handle>
+            <svg class="icon" viewBox="0 0 24 24"><path d="M20 7 10 18l-6-6"/></svg>
+            <div><div class="title">ClickUp</div><div class="kind">acao / destino</div></div>
           </div>
+          <div class="desc" id="clickupNodeDesc">Carregando lista ativa...</div>
+          <div class="badge-row"><span class="badge createonly">so cria tarefas</span></div>
         </div>
-        <div class="safety-banner">
-          <b>Modo seguro:</b> o Movidesk e usado 100% para leitura (nunca exclui ou altera tickets).
-          No ClickUp, a integracao apenas cria tarefas novas na lista escolhida - nunca edita ou apaga
-          tarefas existentes de outras pessoas na pasta.
-        </div>
+
+        <div class="canvas-hint">arraste pelos titulos dos cards para reposicionar</div>
+      </div>
+
+      <div class="safety-banner">
+        <strong>modo seguro</strong> &mdash; o Movidesk e usado 100% para leitura (nunca exclui ou altera tickets).
+        No ClickUp, a integracao apenas cria tarefas novas na lista escolhida &mdash; nunca edita ou apaga
+        tarefas existentes de outras pessoas na pasta.
       </div>
 
       <div class="grid2">
@@ -162,19 +331,24 @@ _PAGE = """<!doctype html>
           <div id="movideskCardBody">Carregando...</div>
         </div>
         <div class="card">
-          <h3>No: ClickUp - pasta/lista do mes</h3>
-          <p class="hint">Cole o Folder ID da pasta atual e escolha a lista certa.</p>
+          <h3>No: ClickUp &mdash; pasta/lista do mes</h3>
+          <p class="hint">Cole o Folder ID da pasta atual (nao o ID da lista) e escolha a lista certa.</p>
           <label>Folder ID do ClickUp</label>
           <input id="folderIdInput" type="text" placeholder="Ex: 90123456789" />
+          <div class="hint-block">
+            No ClickUp: abra a PASTA (nao a lista) &rarr; "..." &rarr; Copiar link. O numero no
+            final do link e o Folder ID. Colar aqui o ID de uma lista (o mesmo numero que aparece
+            em "lista padrao" abaixo) sempre resulta em erro 404.
+          </div>
           <button id="fetchListsBtn" class="secondary" style="margin-top:10px;">Buscar listas dessa pasta</button>
           <div id="foldersMsg" class="msg"></div>
           <div id="listsContainer"></div>
-          <button id="activateBtn" disabled style="margin-top:10px;">Ativar lista selecionada para este mes</button>
+          <button id="activateBtn" class="primary" disabled style="margin-top:12px; width:100%;">Ativar lista selecionada para este mes</button>
           <div id="activateMsg" class="msg"></div>
         </div>
       </div>
 
-      <div class="card" style="margin-top:18px;">
+      <div class="card" style="margin-top:16px;">
         <h3>Historico de listas configuradas</h3>
         <table id="historyTable">
           <thead><tr><th>Mes/Ano</th><th>Pasta</th><th>Lista</th><th>Status</th></tr></thead>
@@ -189,14 +363,32 @@ _PAGE = """<!doctype html>
       </header>
       <div class="integration-grid">
         <div class="integration-card movidesk">
-          <div class="head"><div class="icon">&#128218;</div><h4>Movidesk</h4></div>
+          <div class="head">
+            <div class="head-left">
+              <svg class="icon" viewBox="0 0 24 24"><path d="M4 5h16v11H8l-4 4V5Z"/><path d="M8 9h8M8 12h5"/></svg>
+              <h4>Movidesk</h4>
+            </div>
+          </div>
           <div id="movideskIntegrationBody">Carregando...</div>
+          <div class="test-row">
+            <button class="secondary tiny" id="testMovideskBtn">Testar conexao</button>
+            <span class="status-pill" id="movideskStatusPill">nao testado</span>
+          </div>
         </div>
         <div class="integration-card clickup">
-          <div class="head"><div class="icon">&#9989;</div><h4>ClickUp</h4></div>
+          <div class="head">
+            <div class="head-left">
+              <svg class="icon" viewBox="0 0 24 24"><path d="M20 7 10 18l-6-6"/></svg>
+              <h4>ClickUp</h4>
+            </div>
+          </div>
           <div id="clickupIntegrationBody">Carregando...</div>
+          <div class="test-row">
+            <button class="secondary tiny" id="testClickupBtn">Testar conexao</button>
+            <span class="status-pill" id="clickupStatusPill">nao testado</span>
+          </div>
         </div>
-        <div class="integration-card disabled">+ Nova integracao (em breve)</div>
+        <div class="integration-card disabled">+ nova integracao (em breve)</div>
       </div>
     </section>
 
@@ -248,6 +440,7 @@ document.querySelectorAll("nav.sidebar button.tab[data-tab]").forEach(btn => {
     });
     if (tab === "integracoes") loadIntegrationsStatus();
     if (tab === "logs") loadLogs();
+    if (tab === "fluxo") setTimeout(updateWire, 0);
   });
 });
 
@@ -260,20 +453,24 @@ async function loadFlowStatus() {
       ? `So cria tarefa quando o responsavel (${m.owner_rule}) e ${m.owner_value}`
       : "Nenhuma regra de responsavel configurada (nao bloqueia).";
     $("movideskCardBody").innerHTML = `
-      <div class="kv">Token configurado: <b>${m.configured ? "sim" : "nao"}</b></div>
-      <div class="kv">Regra de responsavel: <b>${m.owner_rule}</b></div>
-      <div class="kv">Valor: <b>${m.owner_value || "-"}</b></div>
-      <div class="kv">Modo: <b>somente leitura</b></div>
+      <div class="kv"><span>Token configurado</span><b>${m.configured ? "sim" : "nao"}</b></div>
+      <div class="kv"><span>Regra de responsavel</span><b>${m.owner_rule}</b></div>
+      <div class="kv"><span>Valor</span><b>${m.owner_value || "-"}</b></div>
+      <div class="kv"><span>Modo</span><b>somente leitura</b></div>
     `;
 
     const c = status.clickup;
     $("clickupNodeDesc").textContent = c.active_list_name
       ? `Cria tarefas em: ${c.active_list_name}`
       : (c.default_list_name ? `Usando lista padrao: ${c.default_list_name}` : "Nenhuma lista ativa configurada ainda.");
-    $("clickupIntegrationBody");
   } catch (e) {
     $("movideskNodeDesc").textContent = "Erro ao carregar: " + e.message;
   }
+}
+
+function setStatusPill(el, state, text) {
+  el.className = "status-pill" + (state ? " " + state : "");
+  el.textContent = text;
 }
 
 async function loadIntegrationsStatus() {
@@ -281,24 +478,37 @@ async function loadIntegrationsStatus() {
     const status = await api("/admin/integrations/status");
     const m = status.movidesk;
     $("movideskIntegrationBody").innerHTML = `
-      <div class="kv">Status: <b>${m.configured ? "conectado" : "token ausente"}</b></div>
-      <div class="kv">Base URL: <b>${m.base_url}</b></div>
-      <div class="kv">Regra de responsavel: <b>${m.owner_rule}</b></div>
-      <div class="kv">Modo: <b>somente leitura</b></div>
+      <div class="kv"><span>Status</span><b>${m.configured ? "conectado" : "token ausente"}</b></div>
+      <div class="kv"><span>Base URL</span><b>${m.base_url}</b></div>
+      <div class="kv"><span>Regra de responsavel</span><b>${m.owner_rule}</b></div>
+      <div class="kv"><span>Modo</span><b>somente leitura</b></div>
     `;
     const c = status.clickup;
     $("clickupIntegrationBody").innerHTML = `
-      <div class="kv">Status: <b>${c.configured ? "conectado" : "token ausente"}</b></div>
-      <div class="kv">Base URL: <b>${c.base_url}</b></div>
-      <div class="kv">Lista ativa: <b>${c.active_list_name || "-"}</b></div>
-      <div class="kv">Lista padrao: <b>${c.default_list_name || "-"}</b></div>
-      <div class="kv">Status da task: <b>${c.task_status || "-"}</b></div>
-      <div class="kv">Responsavel (assignee): <b>${c.assignee_mode}</b></div>
+      <div class="kv"><span>Status</span><b>${c.configured ? "conectado" : "token ausente"}</b></div>
+      <div class="kv"><span>Base URL</span><b>${c.base_url}</b></div>
+      <div class="kv"><span>Lista ativa</span><b>${c.active_list_name || "-"}</b></div>
+      <div class="kv"><span>Lista padrao</span><b>${c.default_list_name || "-"}</b></div>
+      <div class="kv"><span>Status da task</span><b>${c.task_status || "-"}</b></div>
+      <div class="kv"><span>Responsavel (assignee)</span><b>${c.assignee_mode}</b></div>
     `;
   } catch (e) {
     $("movideskIntegrationBody").textContent = "Erro: " + e.message;
   }
 }
+
+async function testConnection(path, pillEl) {
+  setStatusPill(pillEl, "checking", "verificando...");
+  try {
+    const result = await api(path);
+    setStatusPill(pillEl, result.ok ? "ok" : "down", result.message);
+  } catch (e) {
+    setStatusPill(pillEl, "down", e.message);
+  }
+}
+
+$("testMovideskBtn").addEventListener("click", () => testConnection("/admin/movidesk/test-connection", $("movideskStatusPill")));
+$("testClickupBtn").addEventListener("click", () => testConnection("/admin/clickup/test-connection", $("clickupStatusPill")));
 
 // ---- Fluxo: pasta/lista ----
 async function loadActiveList() {
@@ -360,7 +570,7 @@ $("fetchListsBtn").addEventListener("click", async () => {
       container.appendChild(div);
     }
   } catch (e) {
-    msg.textContent = e.message;
+    msg.textContent = e.message + " (confira se colou o Folder ID da pasta, e nao o ID de uma lista)";
     msg.className = "msg error";
   }
 });
@@ -416,6 +626,7 @@ function showApp() {
   $("app").hidden = false;
   loadFlowStatus();
   loadActiveList();
+  setTimeout(layoutNodes, 0);
 }
 
 (async function init() {
@@ -427,6 +638,77 @@ function showApp() {
     $("app").hidden = true;
   }
 })();
+
+// ---- Canvas: nos arrastaveis estilo n8n (template Movidesk -> ClickUp ja pre-ligado) ----
+const canvas = $("flowCanvas");
+const nodeMovidesk = $("nodeMovidesk");
+const nodeClickup = $("nodeClickup");
+let userMovedNodes = false;
+
+function layoutNodes() {
+  if (userMovedNodes || !canvas.clientWidth) return;
+  const w = canvas.clientWidth;
+  const nodeW = nodeMovidesk.offsetWidth || 250;
+  nodeMovidesk.style.left = "36px";
+  nodeMovidesk.style.top = "70px";
+  nodeClickup.style.left = Math.max(36, w - nodeW - 36) + "px";
+  nodeClickup.style.top = "70px";
+  updateWire();
+}
+
+function anchorPoint(node, side) {
+  const rect = node.getBoundingClientRect();
+  const canvasRect = canvas.getBoundingClientRect();
+  const y = rect.top - canvasRect.top + rect.height / 2;
+  const x = side === "right" ? (rect.right - canvasRect.left) : (rect.left - canvasRect.left);
+  return { x, y };
+}
+
+function updateWire() {
+  if (window.innerWidth <= 860) return;
+  const a = anchorPoint(nodeMovidesk, "right");
+  const b = anchorPoint(nodeClickup, "left");
+  const midX = (a.x + b.x) / 2;
+  const d = `M ${a.x} ${a.y} C ${midX} ${a.y}, ${midX} ${b.y}, ${b.x} ${b.y}`;
+  $("wirePath").setAttribute("d", d);
+  $("wireMotion").setAttribute("path", d);
+}
+
+function makeDraggable(node) {
+  const handle = node.querySelector("[data-drag-handle]");
+  let dragging = false;
+  let offsetX = 0, offsetY = 0;
+
+  handle.addEventListener("pointerdown", (ev) => {
+    dragging = true;
+    userMovedNodes = true;
+    node.classList.add("dragging");
+    const rect = node.getBoundingClientRect();
+    offsetX = ev.clientX - rect.left;
+    offsetY = ev.clientY - rect.top;
+    handle.setPointerCapture(ev.pointerId);
+  });
+  handle.addEventListener("pointermove", (ev) => {
+    if (!dragging) return;
+    const canvasRect = canvas.getBoundingClientRect();
+    let x = ev.clientX - canvasRect.left - offsetX;
+    let y = ev.clientY - canvasRect.top - offsetY;
+    x = Math.max(0, Math.min(x, canvas.clientWidth - node.offsetWidth));
+    y = Math.max(0, Math.min(y, canvas.clientHeight - node.offsetHeight));
+    node.style.left = x + "px";
+    node.style.top = y + "px";
+    updateWire();
+  });
+  handle.addEventListener("pointerup", (ev) => {
+    dragging = false;
+    node.classList.remove("dragging");
+    try { handle.releasePointerCapture(ev.pointerId); } catch (e) {}
+  });
+}
+
+makeDraggable(nodeMovidesk);
+makeDraggable(nodeClickup);
+window.addEventListener("resize", layoutNodes);
 </script>
 </body>
 </html>

@@ -14,11 +14,13 @@ from app.schemas import (
     ClickUpIntegrationStatus,
     ClickUpMonthlyListCreate,
     ClickUpMonthlyListResponse,
+    ConnectionTestResult,
     IntegrationLogResponse,
     IntegrationsStatusResponse,
     MovideskIntegrationStatus,
 )
 from app.services.clickup_service import ClickUpService, ClickUpServiceError
+from app.services.movidesk_service import MovideskService, MovideskServiceError
 from app.utils.admin_auth import (
     clear_session_cookie,
     create_session_cookie,
@@ -125,6 +127,37 @@ def integrations_status(
     )
 
     return IntegrationsStatusResponse(movidesk=movidesk, clickup=clickup)
+
+
+# ---------------------------------------------------------------------------
+# Teste de conexao (GET apenas - nunca escreve nada nas APIs externas)
+# ---------------------------------------------------------------------------
+
+
+@router.get("/movidesk/test-connection", response_model=ConnectionTestResult)
+async def test_movidesk_connection(_: str = Depends(require_admin_session)) -> ConnectionTestResult:
+    """Checa se o MOVIDESK_TOKEN funciona. Faz apenas 1 GET, nunca escreve nada."""
+    try:
+        message = await MovideskService().test_connection()
+    except MovideskServiceError as exc:
+        return ConnectionTestResult(ok=False, message=str(exc))
+    return ConnectionTestResult(ok=True, message=message)
+
+
+@router.get("/clickup/test-connection", response_model=ConnectionTestResult)
+async def test_clickup_connection(_: str = Depends(require_admin_session)) -> ConnectionTestResult:
+    """Checa se o CLICKUP_TOKEN funciona (GET /user). Nunca escreve nada."""
+    settings = get_settings()
+    if not settings.clickup_token:
+        return ConnectionTestResult(ok=False, message="CLICKUP_TOKEN nao configurado.")
+    try:
+        user = await ClickUpService().get_authorized_user()
+    except ClickUpServiceError as exc:
+        return ConnectionTestResult(ok=False, message=str(exc))
+    if not user:
+        return ConnectionTestResult(ok=False, message="Token rejeitado ou sem permissao (GET /user falhou).")
+    label = user.get("username") or user.get("email") or "usuario autenticado"
+    return ConnectionTestResult(ok=True, message=f"Conexao OK - token valido, autenticado como {label}.")
 
 
 # ---------------------------------------------------------------------------
