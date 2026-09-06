@@ -96,6 +96,7 @@ class MovideskService:
         owner_id = self._extract_owner_id(owner)
         owner_email = self._extract_owner_email(owner)
         owner_name = self._extract_owner_name(owner)
+        owner_team = self._extract_owner_team(owner)
         actions = self._extract_actions(payload.get("actions") or [])
 
         ticket_id = payload.get("id") or payload.get("Id")
@@ -105,12 +106,18 @@ class MovideskService:
             raise MovideskServiceError("Ticket retornado sem ID.")
 
         service_full = payload.get("serviceFull") or payload.get("service")
+        tags = self._extract_tags(payload.get("tags"))
 
         return MovideskTicket(
             raw=payload,
             id=int(ticket_id),
             subject=str(subject).strip(),
             status=self._to_optional_str(payload.get("status")),
+            category=self._to_optional_str(payload.get("category") or payload.get("Category")),
+            urgency=self._to_optional_str(payload.get("urgency") or payload.get("Urgency")),
+            ticket_type=self._to_optional_str(payload.get("typeName") or payload.get("TypeName")),
+            tags=tags,
+            created_date=self._to_optional_str(payload.get("createdDate") or payload.get("CreatedDate")),
             service_first_level=self._to_optional_str(payload.get("serviceFirstLevel")),
             service_second_level=self._to_optional_str(payload.get("serviceSecondLevel")),
             service_third_level=self._to_optional_str(payload.get("serviceThirdLevel") or service_full),
@@ -118,8 +125,23 @@ class MovideskService:
             owner_id=owner_id,
             owner_email=owner_email,
             owner_name=owner_name,
+            owner_team=owner_team,
             custom_fields=custom_fields,
             actions=actions,
+        )
+
+    @staticmethod
+    def _extract_tags(value: Any) -> list[str]:
+        if not isinstance(value, list):
+            return []
+        return [str(item).strip() for item in value if item is not None and str(item).strip()]
+
+    @staticmethod
+    def _extract_owner_team(owner: Any) -> str | None:
+        if not isinstance(owner, dict):
+            return None
+        return MovideskService._to_optional_str(
+            owner.get("team") or owner.get("Team") or owner.get("teamName") or owner.get("ownerTeam")
         )
 
     @staticmethod

@@ -187,9 +187,12 @@ def build_clickup_description(ticket: MovideskTicket) -> str:
     settings = get_settings()
     cf = ticket.custom_fields
 
+    # So aplica o template se ele realmente tiver o placeholder {ticket_id} - evita
+    # mostrar um valor de configuracao incorreto (ex.: um GUID solto) como se fosse link.
     ticket_url = ""
-    if settings.movidesk_ticket_url_template:
-        ticket_url = settings.movidesk_ticket_url_template.format(ticket_id=ticket.id)
+    template = settings.movidesk_ticket_url_template or ""
+    if "{ticket_id}" in template:
+        ticket_url = template.format(ticket_id=ticket.id)
 
     origin_lines = _field_lines(
         (
@@ -197,9 +200,15 @@ def build_clickup_description(ticket: MovideskTicket) -> str:
             ("Link do ticket", ticket_url),
             ("Assunto", ticket.subject),
             ("Status Movidesk", ticket.status),
+            ("Categoria", ticket.category),
+            ("Urgência", ticket.urgency),
+            ("Tipo", ticket.ticket_type),
+            ("Data de abertura", ticket.created_date),
             ("Solicitante", ticket.requester_name),
             ("Responsável Movidesk", ticket.owner_name),
+            ("Equipe responsável", ticket.owner_team),
             ("Serviço", _service_display_name(ticket)),
+            ("Tags", ", ".join(ticket.tags) if ticket.tags else ""),
         )
     )
 
@@ -220,23 +229,6 @@ def build_clickup_description(ticket: MovideskTicket) -> str:
                 "- Implementar a melhoria solicitada no dashboard, relatorio ou processo informado.",
                 "- Testar o resultado com dados reais.",
                 "- Solicitar validacao do solicitante.",
-            ),
-        ),
-        _section(
-            "CHECKLIST TECNICO",
-            (
-                "- [ ] Validar escopo da solicitacao no ticket Movidesk.",
-                "- [ ] Validar fonte de dados envolvida.",
-                "- [ ] Validar regra de negocio.",
-                "- [ ] Identificar tabelas, campos e filtros necessarios.",
-                "- [ ] Criar ou ajustar medidas/calculos.",
-                "- [ ] Criar ou ajustar visualizacoes.",
-                "- [ ] Validar integracao com filtros existentes.",
-                "- [ ] Ajustar layout conforme padrao do dashboard.",
-                "- [ ] Testar resultado com dados reais.",
-                "- [ ] Solicitar validacao do solicitante.",
-                "- [ ] Atualizar o ticket Movidesk com o andamento.",
-                "- [ ] Encerrar tarefa no ClickUp apos validacao.",
             ),
         ),
     ]

@@ -167,6 +167,11 @@ class MovideskTicket(BaseModel):
     id: int
     subject: str
     status: str | None = None
+    category: str | None = None
+    urgency: str | None = None
+    ticket_type: str | None = None
+    tags: list[str] = Field(default_factory=list)
+    created_date: str | None = None
     service_first_level: str | None = None
     service_second_level: str | None = None
     service_third_level: str | None = None
@@ -174,5 +179,6 @@ class MovideskTicket(BaseModel):
     owner_id: str | None = None
     owner_email: str | None = None
     owner_name: str | None = None
+    owner_team: str | None = None
     custom_fields: dict[str, Any] = Field(default_factory=dict)
     actions: list[MovideskAction] = Field(default_factory=list)

@@ -1,3 +1,4 @@
+from app.config import get_settings
 from app.schemas import MovideskAction, MovideskTicket
 from app.services.description_builder import build_clickup_description, build_clickup_task_name
 
@@ -44,3 +45,52 @@ def test_description_is_plain_text_without_markdown_headers():
     assert "ULTIMAS ACOES DO TICKET" in description
     assert "Ticket action registered for the analytics team." in description
     assert "[Não informado]" not in description
+    assert "CHECKLIST TECNICO" not in description
+    assert "- [ ]" not in description
+
+
+def test_description_includes_richer_movidesk_fields():
+    ticket = MovideskTicket(
+        raw={},
+        id=123456,
+        subject="Analytics request",
+        status="Novo",
+        category="Incidente",
+        urgency="3 - Médio",
+        tags=["#Filho", "#Escalation_GSI"],
+        created_date="2026-09-02T10:42:00",
+        owner_team="GSI-DEV",
+        requester_name="Sample requester",
+    )
+    description = build_clickup_description(ticket)
+
+    assert "Categoria: Incidente" in description
+    assert "Urgência: 3 - Médio" in description
+    assert "Data de abertura: 2026-09-02T10:42:00" in description
+    assert "Equipe responsável: GSI-DEV" in description
+    assert "Tags: #Filho, #Escalation_GSI" in description
+
+
+def test_ticket_url_ignores_misconfigured_template_without_placeholder(monkeypatch):
+    """Se MOVIDESK_TICKET_URL_TEMPLATE estiver mal configurado (ex.: um GUID solto,
+    sem o placeholder {ticket_id}), a descricao nao deve mostrar esse valor como link."""
+    monkeypatch.setenv("MOVIDESK_TICKET_URL_TEMPLATE", "d034f39e-ecf2-4b35-89a4-4dd8c718d5e4")
+    get_settings.cache_clear()
+
+    ticket = MovideskTicket(raw={}, id=748598, subject="Teste")
+    description = build_clickup_description(ticket)
+
+    get_settings.cache_clear()
+    assert "d034f39e" not in description
+    assert "Link do ticket" not in description
+
+
+def test_ticket_url_applies_valid_template(monkeypatch):
+    monkeypatch.setenv("MOVIDESK_TICKET_URL_TEMPLATE", "https://penso.movidesk.com/Ticket/Edit/{ticket_id}")
+    get_settings.cache_clear()
+
+    ticket = MovideskTicket(raw={}, id=748598, subject="Teste")
+    description = build_clickup_description(ticket)
+
+    get_settings.cache_clear()
+    assert "Link do ticket: https://penso.movidesk.com/Ticket/Edit/748598" in description
