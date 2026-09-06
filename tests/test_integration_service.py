@@ -253,3 +253,87 @@ async def test_default_clickup_list_is_used_when_no_active_db_list(db_session, m
     assert created_payload["list_id"] == "1234567890"
     assert created_payload["status"] == "Open"
     assert created_payload["assignee_ids"] == [123456]
+
+
+@pytest.mark.asyncio
+async def test_diagnose_ticket_would_create_task(db_session, monkeypatch):
+    monkeypatch.setenv("CLICKUP_DEFAULT_LIST_ID", "1234567890")
+    monkeypatch.setenv("CLICKUP_DEFAULT_LIST_NAME", "Analytics Requests")
+    monkeypatch.setenv("MOVIDESK_REQUIRED_OWNER_EMAIL", "vinicius.souza@penso.com.br")
+    monkeypatch.delenv("MOVIDESK_REQUIRED_OWNER_ID", raising=False)
+    monkeypatch.delenv("MOVIDESK_REQUIRED_OWNER_NAME", raising=False)
+    get_settings.cache_clear()
+
+    async def fake_get_ticket(self, ticket_id):
+        return make_valid_ticket(id=ticket_id)
+
+    monkeypatch.setattr(MovideskService, "get_ticket", fake_get_ticket)
+
+    result = await IntegrationService(db_session).diagnose_ticket(123456)
+
+    get_settings.cache_clear()
+    assert result["found"] is True
+    assert result["owner_matches"] is True
+    assert result["validation_error"] is None
+    assert result["active_clickup_list_id"] == "1234567890"
+    assert result["would_create_task"] is True
+    assert result["already_integrated"] is False
+
+
+@pytest.mark.asyncio
+async def test_diagnose_ticket_owner_does_not_match(db_session, monkeypatch):
+    monkeypatch.setenv("MOVIDESK_REQUIRED_OWNER_EMAIL", "vinicius.souza@penso.com.br")
+    get_settings.cache_clear()
+
+    async def fake_get_ticket(self, ticket_id):
+        return make_valid_ticket(id=ticket_id, owner_email="outra.pessoa@penso.com.br")
+
+    monkeypatch.setattr(MovideskService, "get_ticket", fake_get_ticket)
+
+    result = await IntegrationService(db_session).diagnose_ticket(123456)
+
+    get_settings.cache_clear()
+    assert result["owner_matches"] is False
+    assert result["would_create_task"] is False
+    assert "responsavel" in result["verdict"].lower()
+
+
+@pytest.mark.asyncio
+async def test_diagnose_ticket_already_integrated(db_session, monkeypatch):
+    db_session.add(
+        IntegrationLog(
+            ticket_id=123456,
+            ticket_subject="Dashboard improvement",
+            status=STATUS_CREATED,
+            clickup_task_id="task-1",
+            clickup_task_url="https://app.clickup.com/t/task-1",
+            message="Criado anteriormente.",
+        )
+    )
+    db_session.commit()
+
+    async def fake_get_ticket(self, ticket_id):
+        return make_valid_ticket(id=ticket_id)
+
+    monkeypatch.setattr(MovideskService, "get_ticket", fake_get_ticket)
+
+    result = await IntegrationService(db_session).diagnose_ticket(123456)
+
+    assert result["already_integrated"] is True
+    assert result["existing_clickup_task_id"] == "task-1"
+    assert result["would_create_task"] is False
+
+
+@pytest.mark.asyncio
+async def test_diagnose_ticket_not_found(db_session, monkeypatch):
+    from app.services.movidesk_service import MovideskServiceError
+
+    async def fake_get_ticket(self, ticket_id):
+        raise MovideskServiceError(f"Ticket {ticket_id} nao encontrado no Movidesk.")
+
+    monkeypatch.setattr(MovideskService, "get_ticket", fake_get_ticket)
+
+    result = await IntegrationService(db_session).diagnose_ticket(999999)
+
+    assert result["found"] is False
+    assert "nao encontrado" in result["error"]

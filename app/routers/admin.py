@@ -19,8 +19,10 @@ from app.schemas import (
     IntegrationLogResponse,
     IntegrationsStatusResponse,
     MovideskIntegrationStatus,
+    TicketDiagnosticResponse,
 )
 from app.services.clickup_service import ClickUpService, ClickUpServiceError
+from app.services.integration_service import IntegrationService
 from app.services.movidesk_service import MovideskService, MovideskServiceError
 from app.utils.admin_auth import (
     clear_session_cookie,
@@ -352,6 +354,25 @@ def activate_clickup_list(
     db.commit()
     db.refresh(row)
     return row
+
+
+# ---------------------------------------------------------------------------
+# Diagnostico de ticket (GET apenas - nunca cria tarefa nem altera o Movidesk)
+#
+# Mostra, para um ticket especifico, exatamente por que a integracao criaria
+# ou nao criaria uma tarefa agora (responsavel, validacao, lista ativa),
+# reaproveitando as mesmas checagens do webhook real.
+# ---------------------------------------------------------------------------
+
+
+@router.get("/diagnostics/ticket/{ticket_id}", response_model=TicketDiagnosticResponse)
+async def diagnose_ticket(
+    ticket_id: int,
+    db: Session = Depends(get_db),
+    _: str = Depends(require_admin_session),
+) -> TicketDiagnosticResponse:
+    result = await IntegrationService(db).diagnose_ticket(ticket_id)
+    return TicketDiagnosticResponse(**result)
 
 
 # ---------------------------------------------------------------------------

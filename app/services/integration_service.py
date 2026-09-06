@@ -163,6 +163,78 @@ class IntegrationService:
             clickup_task_url=task.get("url"),
         )
 
+    async def diagnose_ticket(self, ticket_id: int) -> dict[str, Any]:
+        """Diagnostico somente leitura de elegibilidade de um ticket.
+
+        Reutiliza exatamente as mesmas checagens do fluxo real (_get_success_log,
+        _owner_matches, _validate_ticket, _get_active_clickup_list) para o resultado
+        ser sempre coerente com o que aconteceria em um webhook real, mas NUNCA cria
+        tarefa no ClickUp nem altera nada no Movidesk (apenas 1 GET no Movidesk).
+        """
+        existing_log = self._get_success_log(ticket_id)
+
+        try:
+            ticket = await self.movidesk.get_ticket(ticket_id)
+        except MovideskServiceError as exc:
+            return {"ticket_id": ticket_id, "found": False, "error": str(exc), "verdict": str(exc)}
+
+        required_id = (self.settings.movidesk_required_owner_id or "").strip()
+        required_email = (self.settings.movidesk_required_owner_email or "").strip()
+        required_name = (self.settings.movidesk_required_owner_name or "").strip()
+        if required_id:
+            owner_rule, owner_required_value = "id", required_id
+        elif required_email:
+            owner_rule, owner_required_value = "email", required_email
+        elif required_name:
+            owner_rule, owner_required_value = "nome", required_name
+        else:
+            owner_rule, owner_required_value = "nenhuma (nao bloqueia)", None
+
+        owner_matches = self._owner_matches(ticket)
+        validation_error = self._validate_ticket(ticket)
+        active_list = self._get_active_clickup_list()
+
+        would_create = bool(
+            not existing_log and owner_matches and not validation_error and active_list is not None
+        )
+
+        if existing_log:
+            verdict = "Ja integrado anteriormente: um novo webhook seria idempotente (nao criaria nova tarefa)."
+        elif not owner_matches:
+            verdict = "NAO criaria tarefa: o responsavel atual do ticket nao corresponde a regra configurada."
+        elif validation_error:
+            verdict = f"NAO criaria tarefa: {validation_error}"
+        elif not active_list:
+            verdict = "NAO criaria tarefa: nenhuma lista do ClickUp ativa/configurada."
+        else:
+            verdict = "Criaria uma tarefa no ClickUp agora, se um webhook chegasse para este ticket."
+
+        return {
+            "ticket_id": ticket.id,
+            "found": True,
+            "subject": ticket.subject,
+            "status": ticket.status,
+            "already_integrated": bool(existing_log),
+            "existing_clickup_task_id": existing_log.clickup_task_id if existing_log else None,
+            "existing_clickup_task_url": existing_log.clickup_task_url if existing_log else None,
+            "owner_rule": owner_rule,
+            "owner_required_value": owner_required_value,
+            "owner_id": ticket.owner_id,
+            "owner_email": ticket.owner_email,
+            "owner_name": ticket.owner_name,
+            "owner_matches": owner_matches,
+            "service_first_level": ticket.service_first_level,
+            "service_second_level": ticket.service_second_level,
+            "service_third_level": ticket.service_third_level,
+            "custom_field_criar_tarefa": get_custom_field(ticket.custom_fields, "[BI] Criar tarefa no ClickUp?"),
+            "custom_field_link_clickup": get_custom_field(ticket.custom_fields, "[BI] Link ClickUp"),
+            "validation_error": validation_error,
+            "active_clickup_list_id": active_list.clickup_list_id if active_list else None,
+            "active_clickup_list_name": active_list.clickup_list_name if active_list else None,
+            "would_create_task": would_create,
+            "verdict": verdict,
+        }
+
     @staticmethod
     def extract_ticket_id(payload: dict[str, Any]) -> int | None:
         possible_keys = (

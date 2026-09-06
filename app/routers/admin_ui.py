@@ -420,6 +420,15 @@ _PAGE = """<!doctype html>
         <div><h2>Logs</h2><p>Ultimas execucoes da integracao.</p></div>
       </header>
       <div class="card">
+        <h3>Diagnostico de ticket</h3>
+        <p class="hint">Informe o numero de um ticket do Movidesk para ver, agora, por que a integracao criaria ou nao criaria uma tarefa (somente leitura, nao cria nada).</p>
+        <label>Numero do ticket</label>
+        <input id="diagTicketInput" type="text" placeholder="Ex: 123456" />
+        <button id="diagTicketBtn" class="secondary" style="margin-top:10px;">Verificar</button>
+        <div id="diagMsg" class="msg"></div>
+        <div id="diagResult" style="margin-top:12px;"></div>
+      </div>
+      <div class="card" style="margin-top:16px;">
         <table id="logsTable">
           <thead><tr><th>Ticket</th><th>Assunto</th><th>Status</th><th>Mensagem</th><th>Quando</th></tr></thead>
           <tbody></tbody>
@@ -566,6 +575,66 @@ async function loadLogs() {
     tbody.innerHTML = `<tr><td colspan="5">Erro ao carregar logs: ${e.message}</td></tr>`;
   }
 }
+
+// ---- Diagnostico de ticket (somente leitura) ----
+function diagRow(label, value) {
+  return `<div class="kv"><span>${label}</span><b>${value === null || value === undefined || value === "" ? "-" : value}</b></div>`;
+}
+
+function diagBool(value) {
+  if (value === true) return '<span class="badge ok">sim</span>';
+  if (value === false) return '<span class="badge warn">nao</span>';
+  return "-";
+}
+
+async function runTicketDiagnostic() {
+  const ticketId = ($("diagTicketInput").value || "").trim();
+  const resultEl = $("diagResult");
+  const msgEl = $("diagMsg");
+  resultEl.innerHTML = "";
+  msgEl.textContent = "";
+
+  if (!ticketId) {
+    msgEl.textContent = "Informe o numero do ticket.";
+    return;
+  }
+
+  msgEl.textContent = "Consultando ticket no Movidesk...";
+  try {
+    const d = await api(`/admin/diagnostics/ticket/${encodeURIComponent(ticketId)}`);
+    msgEl.textContent = "";
+
+    if (!d.found) {
+      resultEl.innerHTML = `<div class="kv"><span>Resultado</span><b>${d.error || "Ticket nao encontrado."}</b></div>`;
+      return;
+    }
+
+    const verdictClass = d.would_create_task ? "ok" : (d.already_integrated ? "" : "warn");
+    resultEl.innerHTML = `
+      <div class="kv"><span>Veredito</span><b><span class="badge ${verdictClass}">${d.verdict}</span></b></div>
+      ${diagRow("Assunto", d.subject)}
+      ${diagRow("Status", d.status)}
+      ${diagRow("Ja integrado?", diagBool(d.already_integrated))}
+      ${d.existing_clickup_task_url ? diagRow("Tarefa existente", `<a href="${d.existing_clickup_task_url}" target="_blank" style="color:var(--teal);">abrir no ClickUp</a>`) : ""}
+      ${diagRow("Regra de responsavel", d.owner_rule)}
+      ${diagRow("Valor exigido", d.owner_required_value)}
+      ${diagRow("Responsavel no ticket (ID)", d.owner_id)}
+      ${diagRow("Responsavel no ticket (email)", d.owner_email)}
+      ${diagRow("Responsavel no ticket (nome)", d.owner_name)}
+      ${diagRow("Responsavel confere?", diagBool(d.owner_matches))}
+      ${diagRow("Servico", [d.service_first_level, d.service_second_level, d.service_third_level].filter(Boolean).join(" > "))}
+      ${diagRow("[BI] Criar tarefa no ClickUp?", d.custom_field_criar_tarefa)}
+      ${diagRow("[BI] Link ClickUp", d.custom_field_link_clickup)}
+      ${diagRow("Lista ativa do ClickUp", d.active_clickup_list_name || d.active_clickup_list_id)}
+      ${d.validation_error ? diagRow("Motivo do bloqueio", d.validation_error) : ""}
+    `;
+  } catch (e) {
+    msgEl.textContent = "Erro: " + e.message;
+  }
+}
+
+$("diagTicketBtn").addEventListener("click", runTicketDiagnostic);
+$("diagTicketInput").addEventListener("keydown", (ev) => { if (ev.key === "Enter") runTicketDiagnostic(); });
 
 // ---- Navegador ClickUp: Workspace -> Space -> Folder (evita colar ID errado) ----
 function currentFolderSelection() {

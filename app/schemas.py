@@ -116,6 +116,41 @@ class IntegrationLogResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class TicketDiagnosticResponse(BaseModel):
+    """Diagnostico somente leitura de elegibilidade de um ticket.
+
+    Reutiliza exatamente as mesmas checagens do fluxo real do webhook (responsavel,
+    validacao, lista ativa), mas nunca cria tarefa no ClickUp nem altera nada no
+    Movidesk. Serve para o usuario entender, para um ticket especifico, por que a
+    integracao criaria ou nao criaria uma tarefa.
+    """
+
+    ticket_id: int
+    found: bool
+    error: str | None = None
+    subject: str | None = None
+    status: str | None = None
+    already_integrated: bool = False
+    existing_clickup_task_id: str | None = None
+    existing_clickup_task_url: str | None = None
+    owner_rule: str | None = None
+    owner_required_value: str | None = None
+    owner_id: str | None = None
+    owner_email: str | None = None
+    owner_name: str | None = None
+    owner_matches: bool | None = None
+    service_first_level: str | None = None
+    service_second_level: str | None = None
+    service_third_level: str | None = None
+    custom_field_criar_tarefa: Any = None
+    custom_field_link_clickup: Any = None
+    validation_error: str | None = None
+    active_clickup_list_id: str | None = None
+    active_clickup_list_name: str | None = None
+    would_create_task: bool = False
+    verdict: str
+
+
 class MovideskAction(BaseModel):
     raw: dict[str, Any]
     id: int | str | None = None
